@@ -1,0 +1,4 @@
+export const DEFAULT_CAMERA = {
+  center: { lat: 25.033964, lng: 121.564468 },
+  zoom: 16,
+} as const
