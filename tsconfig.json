@@ -1,27 +1,37 @@
 {
+  // TypeScript 設定檔支援註釋；這些設定供型別檢查與 Next.js 工具鏈使用。
   "compilerOptions": {
+    // 目標語法與可用的瀏覽器、JavaScript 標準函式庫型別。
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
+    // 允許納入 JavaScript 檔，略過相依套件宣告檔的完整型別檢查。
     "allowJs": true,
     "skipLibCheck": true,
+    // 啟用嚴格型別檢查；實際建置交由 Next.js，因此 tsc 不輸出程式碼。
     "strict": true,
     "noEmit": true,
+    // 處理模組互通，並採用打包工具的模組解析方式。
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    // 允許匯入 JSON，並確保每個檔案能獨立轉譯。
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // 使用 React JSX runtime，並快取型別檢查資訊以加速後續檢查。
     "jsx": "react-jsx",
     "incremental": true,
+    // 啟用 Next.js 提供的 TypeScript 編輯器支援。
     "plugins": [
       {
         "name": "next"
       }
     ],
+    // @/ 對應專案根目錄，避免多層相對匯入路徑。
     "paths": {
       "@/*": ["./*"]
     }
   },
+  // 納入專案程式碼與 Next.js 自動產生的環境、路由型別。
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -30,5 +40,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
+  // 不將套件目錄當作待掃描的專案原始碼。
   "exclude": ["node_modules"]
 }

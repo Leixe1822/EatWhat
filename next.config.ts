@@ -1,18 +1,22 @@
 import type { NextConfig } from 'next'
 
+// 正式建置才套用部署路徑，開發環境維持根路徑。
 const isProd = process.env.NODE_ENV === 'production'
-// TODO: Set the project name for the application
+// TODO：依 GitHub Pages 的部署位置填入 repository 名稱。
 const PROJECT_NAME = ''
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 啟用 React Compiler，讓編譯器協助最佳化 React 元件。
   reactCompiler: true,
 
-  // Setting up GitHub Pages
+  // next build 產生 out/ 靜態檔案，供 GitHub Pages 等靜態主機提供服務。
   output: 'export',
+  // 網站路由前綴，例如 /dine-pick。
   basePath: isProd ? `/${PROJECT_NAME}` : '',
+  // Next.js 靜態資源的 URL 前綴。
   assetPrefix: isProd ? `/${PROJECT_NAME}/` : '',
   images: {
+    // 靜態部署不提供 Next.js 伺服器端的圖片最佳化服務。
     unoptimized: true,
   },
 }
