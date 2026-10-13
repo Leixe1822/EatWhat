@@ -53,6 +53,8 @@ App Router 的路由與頁面組裝層。頁面（`page.tsx`）應該盡量「�
 
 MUI 主題設定（`theme.ts`）。若需要客製化元件樣式、色彩、字體，統一在這裡調整，避免在各元件中零散覆寫。
 
+視覺實作優先使用 MUI：版面以 `Box`／`Stack` 排列，文字使用 `Typography`，表單與操作使用 `TextField`／`Button`。頁面專屬尺寸和響應式排列放在 `sx`，共用色彩、字體與元件互動樣式放在 theme。只有 MUI 無法合理處理的情境才另寫 CSS；根版型的 `html`／`body` 與 `next/font` 字體 class 保留框架原生方式。
+
 ## 3. Store 設計慣例（務必遵守）
 
 參考 `domain/key/store.ts` 與 `domain/map/store.ts`，本專案的 Zustand store 採用「**state 與 action 分離**」的寫法，理由是：**不希望 action 被強制以 hook 的方式呼叫**（action 應該可以在任意地方直接呼叫，例如事件處理函式、非元件的工具函式，而不需要在 React 元件內才能使用）。

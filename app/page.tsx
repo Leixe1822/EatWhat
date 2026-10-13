@@ -1,108 +1,90 @@
 'use client'
 
-// 首頁需要表單事件與 React hook，因此宣告為 Client Component。
-import MapContainer from '@/components/MapContainer'
-import useKeyStore, { setKey } from '@/domain/key/store'
-import { APIProvider } from '@/shells/ProviderShell'
-import {
-  Container,
-  Paper,
-  Typography,
-  Box,
-  TextField,
-  Stack,
-  Button,
-} from '@mui/material'
-import { useState } from 'react'
+import NextLink from 'next/link'
+import { Box, Button, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
 
-// PageProps 是 Next.js 依路由產生的全域型別；此頁對應根路徑 /。
-const HomePage: React.FC<PageProps<'/'>> = () => {
-  // 分別訂閱所需欄位；loading 表示 Key 的儲存資料尚未還原，並非地圖載入中。
-  const loading = useKeyStore(s => s.loading)
-  const apiKey = useKeyStore(s => s.key)
-
-  // 改變表單的 React key，讓表單重新掛載並清空非受控的輸入欄位。
-  const [formVersion, setFormVersion] = useState(0)
-
-  // 將輸入的 Key 寫入共用 store；persist 中介層會負責持久化。
-  const handleKeySubmit = (e: React.SubmitEvent) => {
-    // 阻止瀏覽器提交表單後重新載入頁面。
-    e.preventDefault()
-    // FormData 依欄位的 name 取得值；此表單的 apiKey 欄位是文字輸入。
-    const formData = new FormData(e.target)
-    const apiKey = formData.get('apiKey') as string
-    setKey(apiKey)
-    setFormVersion(prev => prev + 1)
-  }
-
+// 首頁使用 MUI 元件與 sx；Client 邊界允許 Link 組合 Next.js 導航元件。
+export default function HomePage() {
   return (
-    <Container
-      sx={{
-        // 以動態視窗高度作為容器高度，padding 也包含在尺寸內。
-        boxSizing: 'border-box',
-        height: '100dvh',
-        py: 2,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        // 標題、表單維持原尺寸，只有 main 伸縮以填滿剩餘空間。
-        '& > *': { flexGrow: 0, flexShrink: 0 },
-        '& > main': { flexGrow: 1, flexShrink: 1, overflow: 'auto' },
-      }}
-    >
-      {/* 視覺使用 h4 字級，語意上仍是頁面的主要標題 h1。 */}
-      <Typography variant='h4' component='h1'>
-        Welcome to Dine Pick
-      </Typography>
-      {/* Paper 實際輸出 form；formVersion 與 Google API Key 是不同用途。 */}
-      <Paper
-        component='form'
-        onSubmit={handleKeySubmit}
-        key={formVersion}
-        sx={{ py: 2 }}
-        elevation={0}
-      >
-        <Stack direction='row' spacing={2} sx={{ alignItems: 'stretch' }}>
-          {/* name 對應 FormData 的讀取鍵；required 提供瀏覽器的必填驗證。 */}
-          <TextField
-            label='API Key'
-            variant='outlined'
-            size='small'
-            fullWidth
-            name='apiKey'
-            required
-            sx={{ flexShrink: 1, flexGrow: 1 }}
-          />
-          {/* submit 會觸發外層表單的 onSubmit；按鈕不隨剩餘寬度伸縮。 */}
-          <Button
-            type='submit'
-            size='small'
-            variant='contained'
-            color='primary'
-            disableElevation
-            sx={{ flexShrink: 0, flexGrow: 0 }}
-          >
-            Submit
-          </Button>
-        </Stack>
-      </Paper>
-      <Box component='main' sx={{ mt: 2, borderRadius: 2, overflow: 'hidden' }}>
-        {/* 依儲存資料還原狀態與 Key 是否存在，切換提示或地圖。 */}
-        {loading && <Typography>Loading API key...</Typography>}
-        {!loading && apiKey && (
-          // 有 Key 才掛載 Provider，讓其子元件可以載入 Google Maps。
-          <APIProvider apiKey={apiKey}>
-            <MapContainer />
-          </APIProvider>
-        )}
-        {!loading && !apiKey && (
-          <Typography variant='caption'>
-            Enter your API key to continue.
-          </Typography>
-        )}
-      </Box>
-    </Container>
+    <Box component='main' sx={{
+      minHeight: '100dvh', bgcolor: 'background.default', color: 'text.primary',
+      p: { xs: 2, md: '24px clamp(20px, 5.5vw, 96px)' },
+    }}>
+      <Stack sx={{ width: '100%', maxWidth: 1680, minHeight: { xs: 'calc(100dvh - 32px)', md: 'calc(100dvh - 48px)' }, mx: 'auto' }}>
+        <Box component='header' sx={theme => ({
+          p: { xs: '28px 32px', md: '38px 52px' },
+          [theme.breakpoints.down(481)]: { p: 3 },
+        })}>
+          <Link component={NextLink} href='/' aria-label='Dine Pick 首頁' underline='none' color='inherit' sx={theme => ({
+            display: 'inline-block', fontSize: 30, fontWeight: 700, fontStyle: 'italic', letterSpacing: '-1px',
+            [theme.breakpoints.down(481)]: { fontSize: 26 },
+          })}>
+            Dine Pick
+          </Link>
+        </Box>
+
+        {/* 桌機保留右側視覺空間；手機改成單欄，沿用原本的版面比例。 */}
+        <Box sx={theme => ({
+          display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, alignItems: 'center', flex: 1,
+          gap: 'clamp(32px, 4vw, 76px)', p: { xs: '64px 32px 96px', md: '64px clamp(40px, 6vw, 120px) 120px' },
+          [theme.breakpoints.down(481)]: { p: '40px 20px 64px' },
+        })}>
+          <Box component='section' aria-labelledby='home-title' sx={{ minWidth: 0, width: '100%', maxWidth: { xs: 600, md: 'none' }, mx: 'auto' }}>
+            <Typography id='home-title' component='h1' variant='h1' sx={{ fontSize: { xs: 'clamp(32px, 6vw, 52px)', md: 'clamp(36px, 3.6vw, 68px)' }, fontWeight: 700, lineHeight: 1.35, letterSpacing: '0.08em' }}>
+              今天吃什麼？
+            </Typography>
+            <Typography component='p' sx={theme => ({
+              mt: '22px', fontSize: { xs: 18, md: 'clamp(16px, 1.45vw, 26px)' }, fontWeight: 600, lineHeight: 1.8, letterSpacing: '0.04em',
+              [theme.breakpoints.down(481)]: { fontSize: 16 },
+            })}>
+              從你目前的位置開始，探索附近的美食！
+            </Typography>
+
+            <Box sx={{ mt: { xs: 5, md: 8 } }}>
+              {/* 使用 TextField 的插槽放入裝飾，保留輸入框的無障礙名稱。 */}
+              <TextField
+                fullWidth
+                name='address'
+                placeholder='輸入地址、地標 ⋯'
+                autoComplete='street-address'
+                slotProps={{
+                  htmlInput: { 'aria-label': '輸入地址或地標' },
+                  input: {
+                    startAdornment: <InputAdornment position='start'><Box component='span' aria-hidden='true' sx={{ fontSize: 26 }}>📍</Box></InputAdornment>,
+                  },
+                }}
+                sx={theme => ({
+                  '& .MuiOutlinedInput-root': {
+                    minHeight: { xs: 80, md: 100 }, p: '20px 24px', borderRadius: '26px',
+                    fontSize: { xs: 18, md: 'clamp(16px, 1.4vw, 24px)' }, fontWeight: 600, letterSpacing: '0.04em',
+                    [theme.breakpoints.down(481)]: { p: '16px 12px', borderRadius: '20px' },
+                  },
+                  '& .MuiOutlinedInput-input': { p: 0 },
+                  '& .MuiOutlinedInput-notchedOutline': { borderWidth: 3, borderColor: 'divider' },
+                  '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 3, borderColor: 'divider' },
+                })}
+              />
+              {/* 保留既有外框；定位與搜尋仍待接入業務邏輯。 */}
+              <Box sx={theme => ({
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '26px', mt: 4,
+                '& .MuiButton-root': {
+                  minWidth: 0, minHeight: { xs: 72, md: 72 }, p: '14px 12px', borderRadius: '18px',
+                  fontSize: { xs: 18, md: 'clamp(15px, 1.35vw, 24px)' },
+                },
+                [theme.breakpoints.down(481)]: {
+                  gap: 1.5, mt: 2.5,
+                  '& .MuiButton-root': { minHeight: 64, p: '12px 6px', fontSize: 15, borderRadius: '14px' },
+                },
+              })}>
+                <Button variant='outlined' type='button'>使用目前位置</Button>
+                <Button variant='contained' type='button'>開始尋找餐廳</Button>
+              </Box>
+            </Box>
+          </Box>
+          <Box aria-hidden='true' sx={{ display: { xs: 'none', md: 'block' } }} />
+        </Box>
+      </Stack>
+    </Box>
   )
 }
-
-export default HomePage
