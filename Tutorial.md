@@ -97,7 +97,7 @@ const value = useFooStore(s => s.value)
 setValue('bar')
 ```
 
-需要持久化的 store（例如 API Key）可搭配 `zustand/middleware` 的 `persist`，並透過 `onRehydrateStorage` 處理 SSR / hydration 期間的 loading 狀態（參考 `domain/key/store.ts`）。
+首頁載入後，會在 `useEffect` 中呼叫 `hydrateKey()`，從瀏覽器的 `localStorage` 讀取金鑰。讀取前顯示載入中，結束後再顯示設定表單或搜尋畫面。只儲存金鑰，不儲存載入狀態；讀取或儲存失敗時會顯示錯誤。之前儲存的 `state.key` 格式也能繼續使用。
 
 需要跨 store 互動時（例如 `domain/map/store.ts` 的 `updateCenter` 會同時操作 `map` 實例），直接在 action 內用 `useXxxStore.getState()` 取得另一個 store 的當下狀態即可，不需要額外設計事件系統。
 
@@ -136,7 +136,7 @@ const debouncedSearch = useDebouncedCallback((keyword: string) => {
 
 ## 5. API Key 使用注意事項
 
-- 目前流程是使用者於首頁表單輸入 API Key，存入 `domain/key/store.ts`（以 `persist` 存到 `localStorage`）。這是教學情境下的簡化做法，**不適合直接用於正式對外服務**，正式環境應改用有 referrer 限制、且權限最小化的 Key，並考慮改由後端代理呼叫（但這會與目前「純靜態部署」的目標衝突，開發前請先想清楚取捨）。
+- 目前流程是使用者於首頁表單輸入 API Key，存入 `domain/key/store.ts`（僅將 key 存到 `localStorage`）。這是教學情境下的簡化做法，**不適合直接用於正式對外服務**，正式環境應改用有 referrer 限制、且權限最小化的 Key，並考慮改由後端代理呼叫（但這會與目前「純靜態部署」的目標衝突，開發前請先想清楚取捨）。
 - 不要把個人的正式 API Key 提交進版本控制，也不要記錄在 README、Tutorial 或程式碼註解中。
 
 ## 6. GitHub Pages 靜態部署注意事項

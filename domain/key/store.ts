@@ -1,42 +1,75 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
-// API Key 領域的共用狀態；操作函式獨立匯出，不存放在 state 內。
 export type KeyStore = {
-  // null 表示尚未提供 Key，或使用者已清除 Key。
   key: string | null
-  // 表示持久化資料是否仍在還原，與 Google Maps 的載入狀態無關。
   loading: boolean
+  storageError: string | null
 }
 
-// 初次建立 store 時先等待儲存資料還原，再決定是否顯示地圖。
-const defaultKeyStore: KeyStore = {
+const useKeyStore = create<KeyStore>(() => ({
   key: null,
   loading: true,
-}
-
-// persist 預設使用瀏覽器 localStorage；未設定 partialize，因此兩個欄位都會保存。
-const useKeyStore = create<KeyStore>()(
-  persist(() => defaultKeyStore, {
-    name: 'map-key-store', // localStorage 中用來識別此 store 的名稱。
-    // 外層回呼在還原前執行，回傳的回呼在還原結束後執行。
-    onRehydrateStorage: () => state => {
-      // 成功取得 state 才結束 loading；目前沒有另行處理還原失敗的情況。
-      if (state) state.loading = false
-    },
-  }),
-)
+  storageError: null,
+}))
 
 export default useKeyStore
+const STORAGE_KEY = 'map-key-store'
 
-// 可在表單事件等位置直接呼叫；更新後會通知訂閱者並觸發持久化。
-const setKey = (key: string) => {
-  useKeyStore.setState({ key })
+// 格式檢查不代表 Google 已授權；實際權限由載入與搜尋結果判斷。
+export function isKeyFormatValid(value: string) {
+  const trimmedKey = value.trim()
+  return /^AIza[\w-]{35}$/.test(trimmedKey)
 }
 
-// 將已保存的 Key 改為 null，不會刪除整個 localStorage 項目。
-const clearKey = () => {
-  useKeyStore.setState({ key: null })
+export function hydrateKey() {
+  if (!useKeyStore.getState().loading) {
+    return
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
+    const savedKey = saved?.state?.key
+    let key: string | null = null
+    if (typeof savedKey === 'string' && isKeyFormatValid(savedKey)) {
+      key = savedKey.trim()
+    }
+    useKeyStore.setState({ key, loading: false })
+  } catch {
+    useKeyStore.setState({
+      loading: false,
+      storageError: '無法讀取已儲存的金鑰，請重新輸入。',
+    })
+  }
 }
 
-export { setKey, clearKey }
+export function setKey(value: string) {
+  const key = value.trim()
+  if (!isKeyFormatValid(key)) {
+    return false
+  }
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { key }, version: 0 })
+    )
+    useKeyStore.setState({ key, storageError: null })
+    return true
+  } catch {
+    useKeyStore.setState({
+      storageError: '無法儲存金鑰，請允許網站使用瀏覽器儲存空間。',
+    })
+    return false
+  }
+}
+
+export function clearKey() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    useKeyStore.setState({ key: null, storageError: null })
+    return true
+  } catch {
+    useKeyStore.setState({
+      storageError: '無法清除已儲存的金鑰，請檢查瀏覽器儲存設定。',
+    })
+    return false
+  }
+}

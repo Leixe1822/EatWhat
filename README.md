@@ -1,6 +1,6 @@
 # Dine Pick 🍽️
 
-以「指定地點」或「目前位置」作為中心點，串接 **Google Places API** 取得附近餐廳推薦，篩選後標記在地圖上並以清單呈現，最後可透過隨機推薦功能，幫你決定待會要吃什麼。
+以「指定地點」或「目前位置」作為中心點，串接 **Google Places API** 取得附近餐廳，標記在地圖上並以清單呈現，最後可透過隨機推薦功能，幫你決定待會要吃什麼。
 
 本專案同時是一份 **教學用範例專案**：目標是提供一份具備清楚分層、可延伸的專案骨架，讓學生在既有結構上繼續實作功能，於實作中學習 Next.js App Router、MUI、Zustand 與 Google Maps API 的整合方式。
 
@@ -9,7 +9,7 @@
 ## 功能特色
 
 - 以指定地點或目前定位為中心，搜尋附近餐廳
-- 篩選搜尋結果並於地圖上標記
+- 搜尋周圍 1 公里內最多 20 間餐廳，並在地圖上標記
 - 以清單方式顯示候選餐廳
 - 隨機推薦功能，協助決定用餐地點
 
@@ -21,15 +21,14 @@
 | UI 元件庫  | [MUI](https://mui.com/material-ui/)                                                        |
 | 狀態管理   | [Zustand](https://zustand.docs.pmnd.rs/)                                                   |
 | 地圖 / API | [@vis.gl/react-google-maps](https://visgl.github.io/react-google-maps/)、Google Places API |
-| 其他工具   | [use-debounce](https://www.npmjs.com/package/use-debounce)                                 |
-| 部署方式   | 靜態輸出（`next export`），部署於 GitHub Pages                                             |
+| 部署方式   | 靜態輸出（`output: 'export'`），部署於 GitHub Pages                                             |
 
 ## 開始使用
 
 ### 環境需求
 
 - Node.js 20 以上
-- 一組具備 Places API 及 Maps JavaScript API 權限的 Google Maps API Key
+- 一組具備 Places API (New) 及 Maps JavaScript API 權限的 Google Maps API Key
 
 ### 安裝依賴
 
@@ -57,6 +56,14 @@ npm run build
 
 ```bash
 npm run lint
+```
+
+## 測試功能
+
+執行下面的指令，可以檢查金鑰儲存、餐廳搜尋和錯誤處理。測試使用假資料，不會呼叫 Google API。
+
+```bash
+node --test tests/state.test.mjs
 ```
 
 ## 專案結構
