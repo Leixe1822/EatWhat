@@ -1,28 +1,36 @@
+// 全站共用版型：字型 → MUI 樣式快取 → 主題 → 金鑰與 Google Maps Provider → 頁面。
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter'
 import type { Metadata } from 'next'
-import { Roboto } from 'next/font/google'
+import { Outfit, Noto_Sans_TC } from 'next/font/google'
 import theme from '@/styles/theme'
+import MapsGate from '@/shells/ProviderShell/MapsGate'
 
-// 由 next/font 管理字體，將字體名稱提供給全站主題使用。
-const roboto = Roboto({
-  weight: ['300', '400', '500', '700'],
+// next/font 在建置時下載並由網站自行提供字型；swap 先顯示備用字型。
+const outfit = Outfit({
   subsets: ['latin'],
-  display: 'swap', // 字體尚未載入時先顯示替代字體。
-  variable: '--font-roboto',
+  display: 'swap',
+  variable: '--font-outfit',
+})
+
+// 中文字型檔較大，不預先載入所有分段；瀏覽器按實際文字載入需要的字形。
+const notoSansTC = Noto_Sans_TC({
+  display: 'swap',
+  preload: false,
+  variable: '--font-noto-sans-tc',
 })
 
 // Next.js 會將網站標題與描述轉換成頁面的 head 資訊。
 export const metadata: Metadata = {
-  title: 'Dine Pick',
-  description: 'Discover and pick the best dining experiences with Dine Pick.',
+  title: 'EatWhat 今天吃什麼',
+  description: '從你目前的位置開始，探索附近餐廳，為下一餐找到靈感。',
 }
 
 // 根版型包住所有頁面；LayoutProps 是 Next.js 產生的全域路由型別。
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    // 指定文件語言，並讓後代元素可以使用 --font-roboto 變數。
-    <html lang='zh-Hant-TW' className={`${roboto.variable}`}>
+    // 把兩組 CSS 字型變數掛到 html，MUI Theme 和 Logo 都能使用。
+    <html lang='zh-Hant-TW' className={`${outfit.variable} ${notoSansTC.variable}`}>
       <body>
         {/* 收集 MUI／Emotion 樣式，配合 App Router 的 HTML 輸出。 */}
         <AppRouterCacheProvider>
@@ -30,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <ThemeProvider theme={theme}>
             {/* 統一瀏覽器預設樣式，再渲染目前路由的內容。 */}
             <CssBaseline />
-            {children}
+            <MapsGate>{children}</MapsGate>
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>

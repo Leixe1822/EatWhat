@@ -1,5 +1,7 @@
 'use client'
 
+// 薄包裝元件：將所有 props 原樣交給套件 APIProvider，不額外載入另一份 Maps。
+
 import { APIProvider } from '@vis.gl/react-google-maps'
 
 // 建立專案共用的 Client Component 入口，提供 Google Maps API 環境。

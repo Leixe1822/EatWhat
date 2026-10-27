@@ -1,6 +1,8 @@
+// 保留的舊版餐廳流程（1 公里搜尋及隨機選餐廳）；目前第二頁使用 useNearbyRestaurants（3 公里）。Restaurant 型別仍共用。
 import { create } from 'zustand'
 import { updateCenter } from '@/domain/map/store'
 
+// 定義畫面需要的欄位；Google 未提供的評分與連結使用 null。
 export type Restaurant = {
   id: string
   name: string
@@ -41,6 +43,7 @@ export function selectRestaurant(id: string) {
   updateCenter(place.location)
 }
 
+// Math.random 產生 0 到小於 1 的數字；乘上數量再取整數可得到有效索引。
 export function pickRestaurant() {
   const places = usePlacesStore.getState().restaurants
   if (places.length === 0) {
@@ -50,6 +53,7 @@ export function pickRestaurant() {
   const restaurant = places[randomIndex]
   selectRestaurant(restaurant.id)
 }
+// 舊版流程保留供既有呼叫端使用，勿與目前首頁的 Geocoding Hook 混用。
 export async function searchRestaurants(useLocation = false) {
   const { status, query } = usePlacesStore.getState()
   if (status === 'locating' || status === 'searching') {
@@ -99,8 +103,9 @@ export async function searchRestaurants(useLocation = false) {
         fields: ['location'],
         maxResultCount: 1,
       })
-      if (!places[0]?.location)
+      if (!places[0]?.location) {
         throw new Error('找不到這個地址或地標，請換個名稱試試。')
+      }
       center = places[0].location.toJSON()
     }
     usePlacesStore.setState({ status: 'searching' })
