@@ -9,17 +9,13 @@ const deploymentPath = isProd && PROJECT_NAME ? `/${PROJECT_NAME}` : ''
 
 const nextConfig: NextConfig = {
   // 啟用 React Compiler，讓編譯器協助最佳化 React 元件。
-
   reactCompiler: true,
 
   // next build 產生 out/ 靜態檔案，供 GitHub Pages 等靜態主機提供服務。
-
   output: 'export',
   // 網站路由前綴，例如 /dine-pick。
-
   basePath: deploymentPath,
   // Next.js 靜態資源的 URL 前綴。
-
   assetPrefix: deploymentPath ? `${deploymentPath}/` : '',
 
   images: {

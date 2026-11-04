@@ -66,22 +66,28 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
   // null 表示尚未手動切換：桌面預設展開，手機預設收合。
   const [listOpen, setListOpen] = useState<boolean | null>(null)
   const map = useMapStore(state => state.map)
-  // 新搜尋使用新的結果陣列，舊選取項目立即失效。
-  let selected: Restaurant | undefined
-  if (selection && selection.results === restaurants) {
-    selected = restaurants.find(restaurant => restaurant.id === selection.id)
-  }
-  // 清單和標記都呼叫這個函式，確保資訊視窗與地圖位置同步。
+  const theme = useTheme()
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
+  // 尚未手動切換時依螢幕大小決定；切換後保留使用者的選擇。
+  const panelOpen = listOpen ?? isDesktop
 
+  // 新搜尋使用新的結果陣列，舊選取項目立即失效。
+  let selectedRestaurant: Restaurant | undefined
+  if (selection && selection.results === restaurants) {
+    selectedRestaurant = restaurants.find(restaurant => restaurant.id === selection.id)
+  }
+
+  // 清單和標記都呼叫這個函式，確保資訊視窗與地圖位置同步。
   function selectRestaurant(restaurant: Restaurant) {
     setSelection({ id: restaurant.id, results: restaurants })
     map?.panTo(restaurant.location)
-    if (!desktop) {
+    if (!isDesktop) {
       setListOpen(false)
     }
   }
+
   function toggleRestaurantList() {
-    setListOpen(previousOpen => !(previousOpen ?? desktop))
+    setListOpen(previousOpen => !(previousOpen ?? isDesktop))
   }
 
   function handleCenterDragEnd(event: google.maps.MapMouseEvent) {
@@ -93,14 +99,36 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
     onCenterChange(newCenter)
   }
 
-  const theme = useTheme()
-  const desktop = useMediaQuery(theme.breakpoints.up('md'))
-  // 尚未手動切換時依螢幕大小決定；切換後保留使用者的選擇。
-  const panelOpen = listOpen ?? desktop
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: panelOpen ? '340px minmax(0, 1fr)' : '72px minmax(0, 1fr)' }, gap: 2, alignItems: 'start' }}>
-      <ResultsPanel restaurants={restaurants} selectedId={selected?.id} open={panelOpen} onToggle={toggleRestaurantList} onSelect={selectRestaurant} />
-      <Box sx={{ minWidth: 0, height: { xs: '65dvh', md: 'calc(100dvh - 190px)' }, minHeight: 360, border: '2px solid', borderColor: 'divider', borderRadius: '24px', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'minmax(0, 1fr)',
+          md: panelOpen ? '340px minmax(0, 1fr)' : '72px minmax(0, 1fr)',
+        },
+        gap: 2,
+        alignItems: 'start',
+      }}
+    >
+      <ResultsPanel
+        restaurants={restaurants}
+        selectedId={selectedRestaurant?.id}
+        open={panelOpen}
+        onToggle={toggleRestaurantList}
+        onSelect={selectRestaurant}
+      />
+      <Box
+        sx={{
+          minWidth: 0,
+          height: { xs: '65dvh', md: 'calc(100dvh - 190px)' },
+          minHeight: 360,
+          border: '2px solid',
+          borderColor: 'divider',
+          borderRadius: '24px',
+          overflow: 'hidden',
+        }}
+      >
         <Map
           mapId={MAP_ID}
           defaultCenter={center}
@@ -130,10 +158,20 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
                   borderColor: 'secondary.main',
                   borderRadius: 2,
                   px: 1,
-                  fontWeight: 800
+                  fontWeight: 800,
                 }}
-              >搜尋中心 ↔</Box>
-              <LocationOnIcon sx={{ fontSize: 64, color: 'primary.main', stroke: 'var(--mui-palette-divider)', strokeWidth: 1, display: 'block' }} />
+              >
+                搜尋中心 ↔
+              </Box>
+              <LocationOnIcon
+                sx={{
+                  fontSize: 64,
+                  color: 'primary.main',
+                  stroke: 'var(--mui-palette-divider)',
+                  strokeWidth: 1,
+                  display: 'block',
+                }}
+              />
             </Stack>
           </AdvancedMarker>
           <SearchRange center={center} />
@@ -144,19 +182,27 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
               position={restaurant.location}
               title={restaurant.name}
               onClick={() => selectRestaurant(restaurant)}
-              zIndex={selected?.id === restaurant.id ? 2 : 1}
+              zIndex={selectedRestaurant?.id === restaurant.id ? 2 : 1}
             >
-              <LocationOnIcon sx={{ fontSize: selected?.id === restaurant.id ? 46 : 38, color: 'secondary.main', stroke: 'var(--mui-palette-background-paper)', strokeWidth: 0.7, display: 'block' }} />
+              <LocationOnIcon
+                sx={{
+                  fontSize: selectedRestaurant?.id === restaurant.id ? 46 : 38,
+                  color: 'secondary.main',
+                  stroke: 'var(--mui-palette-background-paper)',
+                  strokeWidth: 0.7,
+                  display: 'block',
+                }}
+              />
             </AdvancedMarker>
           ))}
           {/* 只有選中餐廳時才建立 InfoWindow；關閉只清空 selection。 */}
-          {selected && (
+          {selectedRestaurant && (
             <InfoWindow
-              key={selected.id}
-              position={selected.location}
+              key={selectedRestaurant.id}
+              position={selectedRestaurant.location}
               pixelOffset={[0, -40]}
               maxWidth={280}
-              headerContent={selected.name}
+              headerContent={selectedRestaurant.name}
               onClose={() => setSelection(null)}
             >
               <Stack
@@ -169,12 +215,18 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
                   borderColor: 'divider',
                   borderRadius: '12px',
                   maxWidth: 240,
-                  overflowWrap: 'anywhere'
+                  overflowWrap: 'anywhere',
                 }}
               >
-                <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700 }}>{selected.name}</Typography>
-                <Typography variant="body2">{selected.address}</Typography>
-                <Typography variant="body2">{selected.rating === null ? '尚無評分' : `評分：${selected.rating} / 5`}</Typography>
+                <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  {selectedRestaurant.name}
+                </Typography>
+                <Typography variant="body2">{selectedRestaurant.address}</Typography>
+                <Typography variant="body2">
+                  {selectedRestaurant.rating === null
+                    ? '尚無評分'
+                    : `評分：${selectedRestaurant.rating} / 5`}
+                </Typography>
               </Stack>
             </InfoWindow>
           )}

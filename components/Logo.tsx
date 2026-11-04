@@ -12,8 +12,12 @@ export default function Logo() {
       href="/"
       aria-label="EatWhat 首頁"
       sx={{
-        display: 'inline-flex', alignItems: 'center', gap: 1.25,
-        color: 'text.primary', textDecoration: 'none', flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 1.25,
+        color: 'text.primary',
+        textDecoration: 'none',
+        flexShrink: 0,
         borderRadius: '12px',
         '&:focus-visible': { outline: '3px solid', outlineColor: 'text.primary', outlineOffset: 5 },
       }}
@@ -22,10 +26,16 @@ export default function Logo() {
       <Box
         component="span"
         sx={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: { xs: 38, sm: 44 }, height: { xs: 38, sm: 44 },
-          bgcolor: 'primary.main', color: 'text.primary',
-          border: '2px solid', borderColor: 'divider', borderRadius: '12px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: { xs: 38, sm: 44 },
+          height: { xs: 38, sm: 44 },
+          bgcolor: 'primary.main',
+          color: 'text.primary',
+          border: '2px solid',
+          borderColor: 'divider',
+          borderRadius: '12px',
           boxShadow: '2px 2px 0 var(--mui-palette-divider)',
         }}
       >
@@ -34,11 +44,16 @@ export default function Logo() {
       <Typography
         component="span"
         sx={{
-          fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 800,
-          fontSize: { xs: 27, sm: 32 }, lineHeight: 1.1,
-          letterSpacing: '-0.04em', whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-outfit), sans-serif',
+          fontWeight: 800,
+          fontSize: { xs: 27, sm: 32 },
+          lineHeight: 1.1,
+          letterSpacing: '-0.04em',
+          whiteSpace: 'nowrap',
         }}
-      >EatWhat.</Typography>
+      >
+        EatWhat.
+      </Typography>
     </Box>
   )
 }

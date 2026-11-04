@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     // 把兩組 CSS 字型變數掛到 html，MUI Theme 和 Logo 都能使用。
-    <html lang='zh-Hant-TW' className={`${outfit.variable} ${notoSansTC.variable}`}>
+    <html lang="zh-Hant-TW" className={`${outfit.variable} ${notoSansTC.variable}`}>
       <body>
         {/* 收集 MUI／Emotion 樣式，配合 App Router 的 HTML 輸出。 */}
         <AppRouterCacheProvider>

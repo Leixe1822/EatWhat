@@ -2,7 +2,7 @@
 import type { Restaurant } from './store'
 import { isValidCenter, type Center } from '@/domain/map/location'
 
-export const SEARCH_RADIUS = 3000 // 公尺，等於 3 公里。
+export const SEARCH_RADIUS = 1000 // 公尺，等於 1 公里。
 export const MAX_RESULTS = 20 // 單次最多 20 筆，不代表範圍內的全部餐廳。
 const CACHE_DURATION = 60000 // 同一中心點的結果保留 60 秒。
 const SEARCH_TIMEOUT = 20000 // 最多等待 20 秒。
@@ -45,7 +45,10 @@ function convertPlacesToRestaurants(places: google.maps.places.Place[]): Restaur
   return restaurants
 }
 
-export function fetchNearby(library: google.maps.PlacesLibrary, center: Center): Promise<Restaurant[]> {
+export function fetchNearby(
+  library: google.maps.PlacesLibrary,
+  center: Center,
+): Promise<Restaurant[]> {
   if (!isValidCenter(center)) {
     return Promise.reject(new Error('無效中心點'))
   }

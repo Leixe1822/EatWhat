@@ -46,7 +46,9 @@ const theme = createTheme({
           minHeight: 44,
           padding: '10px 22px',
           borderRadius: 999,
-          transition: theme.transitions.create(['transform', 'box-shadow', 'background-color'], { duration: 150 }),
+          transition: theme.transitions.create(['transform', 'box-shadow', 'background-color'], {
+            duration: 150,
+          }),
           '@media (hover: hover)': {
             '&:hover:not(.Mui-disabled)': { transform: 'translateY(-2px)' },
           },
@@ -79,7 +81,7 @@ const theme = createTheme({
           boxShadow: `2px 2px 0 ${theme.palette.divider}`,
           '&:hover': {
             border: `2px solid ${theme.palette.divider}`,
-            backgroundColor: theme.palette.action.hover
+            backgroundColor: theme.palette.action.hover,
           },
           '&.Mui-disabled': { borderColor: theme.palette.action.disabled, boxShadow: 'none' },
         }),
@@ -141,9 +143,12 @@ const theme = createTheme({
           borderRadius: 2,
           '&:hover': {
             backgroundColor: alpha(theme.palette.primary.main, 0.45),
-            textDecorationThickness: '2px'
+            textDecorationThickness: '2px',
           },
-          '&:focus-visible': { outline: `3px solid ${theme.palette.text.primary}`, outlineOffset: 4 },
+          '&:focus-visible': {
+            outline: `3px solid ${theme.palette.text.primary}`,
+            outlineOffset: 4,
+          },
         }),
       },
     },

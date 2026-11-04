@@ -12,17 +12,19 @@ export function isValidCenter(center: Center) {
 
 // URL 是外部輸入：拒絕缺值、重複參數、空白、非十進位格式與超出範圍。
 export function parseCenter(params: Pick<URLSearchParams, 'getAll'>): Center | null {
-  const lat = params.getAll('lat')
-  const lng = params.getAll('lng')
+  const latitudeValues = params.getAll('lat')
+  const longitudeValues = params.getAll('lng')
   // 正規表示式只接受十進位數字；不接受空字串、NaN、Infinity 或十六進位。
   const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
-  if (lat.length !== 1 || lng.length !== 1) {
+
+  if (latitudeValues.length !== 1 || longitudeValues.length !== 1) {
     return null
   }
-  if (!decimal.test(lat[0]) || !decimal.test(lng[0])) {
+  if (!decimal.test(latitudeValues[0]) || !decimal.test(longitudeValues[0])) {
     return null
   }
-  const center = { lat: Number(lat[0]), lng: Number(lng[0]) }
+
+  const center = { lat: Number(latitudeValues[0]), lng: Number(longitudeValues[0]) }
   if (!isValidCenter(center)) {
     return null
   }
@@ -46,7 +48,7 @@ export function getCurrentCenter(): Promise<Center> {
         }
         reject(new Error(messages[error.code] ?? '定位失敗，請改用地址搜尋。'))
       },
-      { timeout: 10000, maximumAge: 60000 }
+      { timeout: 10000, maximumAge: 60000 },
     )
   })
 }

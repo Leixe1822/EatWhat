@@ -7,9 +7,12 @@ import RestaurantsPage from '@/components/RestaurantsPage/RestaurantsPage'
 export default function Page() {
   return (
     <Suspense
-      fallback={<Box sx={{ maxWidth: 880, mx: 'auto', p: 4 }}>
-        <Typography role="status">正在讀取位置…</Typography><Skeleton variant="rounded" height={240} />
-      </Box>}
+      fallback={
+        <Box sx={{ maxWidth: 880, mx: 'auto', p: 4 }}>
+          <Typography role="status">正在讀取位置…</Typography>
+          <Skeleton variant="rounded" height={240} />
+        </Box>
+      }
     >
       <RestaurantsPage />
     </Suspense>

@@ -1,5 +1,26 @@
 # EatWhat 變更紀錄
 
+## 2026-11-04：Places 地址建議與文字搜尋整合
+
+### 搜尋流程
+
+- `domain/map/usePlaceAutocomplete.ts`：新增 Places API (New) 建議搜尋，使用繁體中文與台灣區域設定，加入 300 毫秒輸入延遲、session token、過期回覆排除及錯誤提示。
+- `components/LandingPage/HomeHero.tsx`：地址欄位改用 MUI Autocomplete，保留自由輸入，支援建議選取並顯示 Google Maps 來源標示。
+- `components/LandingPage/LandingPage.tsx`：選取建議只更新文字及暫存地點；提交表單時才取得座標，修改文字則清除先前選項。
+- `domain/map/useLocationSearch.ts`：移除 Geocoding API，未選建議時改用 Place.searchByText 取得第一筆地點的 location；已選建議時呼叫 fetchFields，只要求 location。成功後更新 mapStore center 並導航，保留目前位置、逾時與重複提交防護。
+- `domain/map/searchError.ts`：授權錯誤改提示檢查 Places API (New)，保留固定錯誤文案與診斷資訊遮蔽。
+
+### 地圖與程式整理
+
+- `domain/places/nearby.ts`：附近餐廳搜尋半徑由 3 公里改為 1 公里，仍最多回傳 20 筆。
+- `domain/map/config.ts`：預設縮放由 12 改為 0.01。
+- 地圖、餐廳頁與結果面板：整理變數及事件命名，抽出餐廳清單項目元件，保留清單收合、選取與地圖同步行為。
+- 首頁、Logo、金鑰設定、MapsGate、store、主題與設定檔：整理排版及程式可讀性；補充新搜尋流程的中文註解。
+- `tests/state.test.mjs`：更新 Places 授權提示斷言，將附近搜尋半徑測試同步為 1 公里。
+
+驗證：TypeScript、全專案 ESLint、13 項自動化測試及 Git 差異空白檢查通過。本次未重新執行正式建置、真實 Google API 與瀏覽器視覺驗收。
+
+
 ## 2026-10-27：整合首頁、品牌與餐廳地圖探索
 
 本次將開發中的功能整合為一筆提交，目標分支為 develop。

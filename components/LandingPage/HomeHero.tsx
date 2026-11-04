@@ -1,9 +1,20 @@
 'use client'
 
 // 首頁展示元件：負責排版與表單；透過 props 接收資料與事件，不直接呼叫 Google。
-import type { ReactNode, SubmitEvent } from 'react'
+import type { ComponentProps, ReactNode, SubmitEvent } from 'react'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
-import { Box, Button, Chip, Grid, InputAdornment, Paper, Stack, TextField, Typography } from '@mui/material'
+import {
+  Autocomplete,
+  Box,
+  Button,
+  Chip,
+  Grid,
+  InputAdornment,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 
 // 版面只接收顯示內容，搜尋與 API 狀態由 LandingPage 管理。
 type HomeHeroProps = {
@@ -30,7 +41,7 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
               borderColor: 'divider',
               fontWeight: 800,
               letterSpacing: '0.035em',
-              fontSize: { xs: 12, sm: 14 }
+              fontSize: { xs: 12, sm: 14 },
             }}
           />
           <Typography
@@ -39,14 +50,20 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
               fontSize: { xs: 40, sm: 52, md: 48, lg: 60 },
               fontWeight: 800,
               lineHeight: 1.35,
-              letterSpacing: '-0.025em'
+              letterSpacing: '-0.025em',
             }}
           >
             今天吃什麼？
           </Typography>
-          <Typography color="text.secondary" sx={{ fontSize: { xs: 16, sm: 18 }, lineHeight: 1.7 }}>從你的附近開始，發現每一口驚喜。</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: { xs: 16, sm: 18 }, lineHeight: 1.7 }}>
+            從你的附近開始，發現每一口驚喜。
+          </Typography>
           {children}
-          {feedback && <Box role="status" aria-live="polite">{feedback}</Box>}
+          {feedback && (
+            <Box role="status" aria-live="polite">
+              {feedback}
+            </Box>
+          )}
         </Stack>
       </Grid>
       <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
@@ -64,10 +81,9 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
             aspectRatio: '0.9',
             width: '100%',
             maxWidth: { xs: 600, md: 'none' },
-            mx: 'auto'
+            mx: 'auto',
           }}
-        >
-        </Box>
+        ></Box>
       </Grid>
     </Grid>
   )
@@ -78,12 +94,24 @@ type SearchCardProps = {
   query?: string
   busy?: boolean
   ready?: boolean
-  geocodingReady?: boolean
+  searchReady?: boolean
   onQueryChange?: (value: string) => void
   onSearch?: (event: SubmitEvent<HTMLFormElement>) => void
+  suggestions?: google.maps.places.PlacePrediction[]
+  onSelectPlace?: (place: google.maps.places.PlacePrediction) => void
   onLocate?: () => void
 }
-export function SearchCard({ query = '', busy = false, ready = false, geocodingReady = false, onQueryChange, onSearch, onLocate }: SearchCardProps) {
+export function SearchCard({
+  query = '',
+  busy = false,
+  ready = false,
+  searchReady = false,
+  onQueryChange,
+  onSearch,
+  onLocate,
+  suggestions = [],
+  onSelectPlace,
+}: SearchCardProps) {
   // SubmitEvent 是提交事件；HTMLFormElement 是觸發事件的表單元素型別。
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     // 沒有傳入搜尋函式時仍阻止瀏覽器送出原生表單，避免整頁重新載入。
@@ -103,52 +131,110 @@ export function SearchCard({ query = '', busy = false, ready = false, geocodingR
         border: '2px solid',
         borderColor: 'divider',
         borderRadius: '26px',
-        boxShadow: `4px 4px 0 ${theme.palette.divider}`
+        boxShadow: `4px 4px 0 ${theme.palette.divider}`,
       })}
     >
       <Stack spacing={2.5}>
-        <TextField
-          variant="standard"
-          placeholder="輸入地址或地標"
-          value={query}
-          onChange={event => onQueryChange?.(event.target.value)}
-          disabled={!ready || busy}
+        <Autocomplete
+          freeSolo
           fullWidth
-          slotProps={{
-            htmlInput: { 'aria-label': '輸入地址或地標' },
-            input: {
-              startAdornment: <InputAdornment position="start"><Box
-                component="svg"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                sx={{ width: 23, height: 23, color: 'text.secondary' }}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              ><path d="M12 22s8-8 8-14a8 8 0 0 0-16 0c0 6 8 14 8 14Z" transform="translate(2 2) scale(.83)" /><circle cx="12" cy="9" r="2.5" /></Box></InputAdornment>
-            }
+          disabled={!ready || busy}
+          options={suggestions}
+          inputValue={query}
+          value={null}
+          filterOptions={options => options}
+          getOptionLabel={option => typeof option === 'string' ? option : option.text.toString()}
+          getOptionKey={option => typeof option === 'string' ? option : option.placeId}
+          onInputChange={(_, value, reason) => {
+            if (reason === 'input' || reason === 'clear') onQueryChange?.(value)
           }}
-          sx={{
-            '& .MuiInput-root': {
-              minHeight: 68,
-              pb: 2,
-              px: 0.5,
-              '&::before': { borderBottomColor: 'divider', opacity: 0.18 },
-              '&::after': { borderBottomColor: 'text.primary' },
-              '&.Mui-focused': { outline: '2px solid', outlineColor: 'text.primary', outlineOffset: 4, borderRadius: 1 }
-            },
-            '& input': { fontSize: { xs: 16, sm: 18 } }
+          onChange={(_, option) => {
+            if (option && typeof option !== 'string') onSelectPlace?.(option)
           }}
+          renderOption={(props, option) => {
+            const { key, ...rest } = props
+            return <li key={key} {...rest}>{option.text.toString()}</li>
+          }}
+          slots={{
+            paper: SuggestionsPaper,
+          }}
+          renderInput={params => (
+            <TextField
+              {...params}
+              variant="standard"
+              placeholder="輸入地址或地標"
+              disabled={!ready || busy}
+              fullWidth
+              slotProps={{
+                ...params.slotProps,
+                htmlInput: { ...params.slotProps.htmlInput, 'aria-label': '輸入地址或地標' },
+                input: {
+                  ...params.slotProps.input,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box
+                        component="svg"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        sx={{ width: 23, height: 23, color: 'text.secondary' }}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path
+                          d="M12 22s8-8 8-14a8 8 0 0 0-16 0c0 6 8 14 8 14Z"
+                          transform="translate(2 2) scale(.83)"
+                        />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </Box>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{
+                '& .MuiInput-root': {
+                  minHeight: 68,
+                  pb: 2,
+                  px: 0.5,
+                  '&::before': { borderBottomColor: 'divider', opacity: 0.18 },
+                  '&::after': { borderBottomColor: 'text.primary' },
+                  '&.Mui-focused': {
+                    outline: '2px solid',
+                    outlineColor: 'text.primary',
+                    outlineOffset: 4,
+                    borderRadius: 1,
+                  },
+                },
+                '& input': { fontSize: { xs: 16, sm: 18 } },
+              }}
+            />
+          )}
         />
         {/* row 讓兩個按鈕左右並排，各佔一半寬度。 */}
-        <Stack direction="row" spacing={1} sx={{ '& > button': { flex: 1, minWidth: 0, px: { xs: 0.5, sm: 2 }, whiteSpace: 'nowrap' } }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            '& > button': { flex: 1, minWidth: 0, px: { xs: 0.5, sm: 2 }, whiteSpace: 'nowrap' },
+          }}
+        >
           <Button
             type="submit"
             variant="contained"
-            disabled={!ready || busy || !geocodingReady}
+            disabled={!ready || busy || !searchReady}
             fullWidth
-            sx={{ minHeight: 52, boxShadow: 'none', borderWidth: 1.5, fontSize: { xs: 14, sm: 17 } }}
-          >開始探索 <Box component="span" aria-hidden="true" sx={{ ml: 1 }}>→</Box></Button>
+            sx={{
+              minHeight: 52,
+              boxShadow: 'none',
+              borderWidth: 1.5,
+              fontSize: { xs: 14, sm: 17 },
+            }}
+          >
+            開始探索{' '}
+            <Box component="span" aria-hidden="true" sx={{ ml: 1 }}>
+              →
+            </Box>
+          </Button>
           <Button
             type="button"
             variant="text"
@@ -157,10 +243,29 @@ export function SearchCard({ query = '', busy = false, ready = false, geocodingR
             // startIcon 自動將圖示放在文字左側；onClick 仍沿用原定位函式。
             startIcon={<MyLocationIcon sx={{ color: 'text.primary' }} />}
             fullWidth
-            sx={{ fontWeight: 500, fontSize: { xs: 13, sm: 14 }, justifyContent: 'center', '& .MuiButton-startIcon': { ml: 0, mr: 1 } }}
-          >使用目前位置</Button>
+            sx={{
+              fontWeight: 500,
+              fontSize: { xs: 13, sm: 14 },
+              justifyContent: 'center',
+              '& .MuiButton-startIcon': { ml: 0, mr: 1 },
+            }}
+          >
+            使用目前位置
+          </Button>
         </Stack>
       </Stack>
+    </Paper>
+  )
+}
+
+// 建議清單未與地圖同時顯示，因此保留 Google Maps 來源標示。
+function SuggestionsPaper(props: ComponentProps<typeof Paper>) {
+  return (
+    <Paper {...props}>
+      {props.children}
+      <Box sx={{ px: 2, py: 1, textAlign: 'right', fontSize: 12, color: 'text.secondary' }}>
+        Google Maps
+      </Box>
     </Paper>
   )
 }

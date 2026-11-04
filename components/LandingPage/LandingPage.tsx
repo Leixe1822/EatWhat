@@ -13,30 +13,36 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import {
-  APILoadingStatus,
-  useApiLoadingStatus,
-} from '@vis.gl/react-google-maps'
+import { APILoadingStatus, useApiLoadingStatus } from '@vis.gl/react-google-maps'
 import HomeHero, { SearchCard } from './HomeHero'
 import Logo from '@/components/Logo'
 import KeySettings from '@/components/KeySettings'
 import useKeyStore from '@/domain/key/store'
 import useLocationSearch from '@/domain/map/useLocationSearch'
-
+import usePlaceAutocomplete from '@/domain/map/usePlaceAutocomplete'
 
 // 只有 Maps ready 後才掛載，因此搜尋 Hook 一定在 APIProvider 裡。
 function Explorer() {
   const apiStatus = useApiLoadingStatus()
-  const { query, setQuery, status, error, locate, geocodingReady } = useLocationSearch()
+  const { query, setQuery, status, error, locate, placesReady } = useLocationSearch()
+  // 選取建議只暫存 prediction；handleSearch 才取得座標並更新地圖中心。
+  const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlacePrediction | null>(null)
   const busy = status !== 'idle'
   const ready = apiStatus === APILoadingStatus.LOADED
-  const failed = apiStatus === APILoadingStatus.FAILED || apiStatus === APILoadingStatus.AUTH_FAILURE
+  const autocomplete = usePlaceAutocomplete(query, ready && !busy && !selectedPlace)
+  const searchReady = Boolean(selectedPlace) || placesReady
+  const failed =
+    apiStatus === APILoadingStatus.FAILED || apiStatus === APILoadingStatus.AUTH_FAILURE
+  const loadingMessage = status === 'locating' ? '正在取得位置…' : '正在查詢地點…'
+
   // form 的 submit 同時支援按鈕與 Enter；preventDefault 阻止瀏覽器整頁提交。
   function handleSearch(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     // void 表示不在事件函式內等待；Hook 自己處理載入與錯誤。
-    void locate()
+    void locate(false, selectedPlace ?? undefined)
+    autocomplete.resetSession()
   }
+
   function handleLocationSearch() {
     void locate(true)
   }
@@ -45,20 +51,40 @@ function Explorer() {
     <HomeHero
       feedback={
         <Stack spacing={1.5}>
-          {failed && <Alert severity="error">Google Maps 載入或授權失敗。請檢查網路與金鑰設定，更新後重新載入。</Alert>}
+          {failed && (
+            <Alert severity="error">
+              Google Maps 載入或授權失敗。請檢查網路與金鑰設定，更新後重新載入。
+            </Alert>
+          )}
           {!ready && !failed && <Alert severity="info">正在載入 Google Maps…</Alert>}
-          {busy && <Stack direction="row" spacing={2}><CircularProgress size={22} /><Typography>{status === 'locating' ? '正在取得位置…' : '正在查詢地點…'}</Typography></Stack>}
+          {busy && (
+            <Stack direction="row" spacing={2}>
+              <CircularProgress size={22} />
+              <Typography>{loadingMessage}</Typography>
+            </Stack>
+          )}
+          {autocomplete.error && <Alert severity="warning">{autocomplete.error}</Alert>}
           {error && <Alert severity="error">{error}</Alert>}
-          {!geocodingReady && <Typography variant="body2">正在準備地址查詢服務；你也可以使用目前位置。</Typography>}
+          {!searchReady && (
+            <Typography variant="body2">正在準備地址查詢服務；你也可以使用目前位置。</Typography>
+          )}
         </Stack>
       }
     >
       <SearchCard
+        suggestions={autocomplete.options}
+        onSelectPlace={prediction => {
+          setQuery(prediction.text.toString())
+          setSelectedPlace(prediction)
+        }}
         query={query}
-        onQueryChange={setQuery}
+        onQueryChange={value => {
+          setSelectedPlace(null)
+          setQuery(value)
+        }}
         busy={busy}
         ready={ready}
-        geocodingReady={geocodingReady}
+        searchReady={searchReady}
         onSearch={handleSearch}
         onLocate={handleLocationSearch}
       />
@@ -67,8 +93,8 @@ function Explorer() {
 }
 
 export default function LandingPage() {
-  const loading = useKeyStore((state) => state.loading)
-  const ready = useKeyStore((state) => state.ready)
+  const loading = useKeyStore(state => state.loading)
+  const ready = useKeyStore(state => state.ready)
   // 這個開關只影響首頁的設定視窗，不必放進 Zustand。
   const [settingsOpen, setSettingsOpen] = useState(false)
   return (
@@ -99,12 +125,20 @@ export default function LandingPage() {
           variant="outlined"
           onClick={() => setSettingsOpen(true)}
           sx={{ borderWidth: 1, boxShadow: 'none', bgcolor: 'transparent', fontWeight: 500 }}
-        >金鑰設定</Button>
+        >
+          金鑰設定
+        </Button>
       </Stack>
       <Box component="main">
-        {ready ? <Explorer /> : (
+        {ready ? (
+          <Explorer />
+        ) : (
           <HomeHero
-                  feedback={<Typography>{loading ? '正在載入地圖…' : '請先完成金鑰設定，再開始探索。'}</Typography>}
+            feedback={
+              <Typography>
+                {loading ? '正在載入地圖…' : '請先完成金鑰設定，再開始探索。'}
+              </Typography>
+            }
           >
             <SearchCard />
           </HomeHero>
@@ -122,10 +156,7 @@ export default function LandingPage() {
           sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}
         >
           設定
-          <Button
-            onClick={() => setSettingsOpen(false)}
-            size="small"
-          >
+          <Button onClick={() => setSettingsOpen(false)} size="small">
             關閉
           </Button>
         </DialogTitle>

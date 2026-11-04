@@ -33,9 +33,7 @@ export function setQuery(query: string) {
 }
 
 export function selectRestaurant(id: string) {
-  const place = usePlacesStore
-    .getState()
-    .restaurants.find((restaurant) => restaurant.id === id)
+  const place = usePlacesStore.getState().restaurants.find(restaurant => restaurant.id === id)
   if (!place) {
     return
   }
@@ -53,7 +51,7 @@ export function pickRestaurant() {
   const restaurant = places[randomIndex]
   selectRestaurant(restaurant.id)
 }
-// 舊版流程保留供既有呼叫端使用，勿與目前首頁的 Geocoding Hook 混用。
+// 舊版流程保留供既有呼叫端使用，勿與目前首頁的位置搜尋 Hook 混用。
 export async function searchRestaurants(useLocation = false) {
   const { status, query } = usePlacesStore.getState()
   if (status === 'locating' || status === 'searching') {
@@ -78,26 +76,24 @@ export async function searchRestaurants(useLocation = false) {
           return
         }
         navigator.geolocation.getCurrentPosition(
-          (position) => {
+          position => {
             resolve({
               lat: position.coords.latitude,
               lng: position.coords.longitude,
             })
           },
-          (error) => {
+          error => {
             let message = '無法取得位置，請重試或輸入地址。'
             if (error.code === 1) {
               message = '定位權限遭拒，請允許定位或改用地址搜尋。'
             }
             reject(new Error(message))
           },
-          { timeout: 10000, maximumAge: 60000 }
+          { timeout: 10000, maximumAge: 60000 },
         )
       })
     } else {
-      const { Place } = (await google.maps.importLibrary(
-        'places'
-      )) as google.maps.PlacesLibrary
+      const { Place } = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
       const { places } = await Place.searchByText({
         textQuery: query.trim(),
         fields: ['location'],
@@ -110,18 +106,9 @@ export async function searchRestaurants(useLocation = false) {
     }
     usePlacesStore.setState({ status: 'searching' })
     updateCenter(center)
-    const { Place } = (await google.maps.importLibrary(
-      'places'
-    )) as google.maps.PlacesLibrary
+    const { Place } = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
     const { places } = await Place.searchNearby({
-      fields: [
-        'id',
-        'displayName',
-        'formattedAddress',
-        'location',
-        'rating',
-        'googleMapsURI',
-      ],
+      fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'googleMapsURI'],
       locationRestriction: { center, radius: 1000 },
       includedTypes: ['restaurant'],
       maxResultCount: 20,
@@ -143,13 +130,9 @@ export async function searchRestaurants(useLocation = false) {
     }
     usePlacesStore.setState({ restaurants, status: 'success' })
   } catch (error) {
-    let message =
-      '搜尋失敗，請確認網路、金鑰權限、Places API (New) 與帳單設定後重試。'
+    let message = '搜尋失敗，請確認網路、金鑰權限、Places API (New) 與帳單設定後重試。'
     // 定位和地址錯誤可以直接顯示；Google 的錯誤改用上面的提示。
-    if (
-      error instanceof Error &&
-      /^(此瀏覽器|定位|無法取得|找不到)/.test(error.message)
-    ) {
+    if (error instanceof Error && /^(此瀏覽器|定位|無法取得|找不到)/.test(error.message)) {
       message = error.message
     }
     usePlacesStore.setState({ status: 'error', error: message })

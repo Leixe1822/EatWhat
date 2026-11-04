@@ -109,14 +109,14 @@ test('清除已保存金鑰後重新載入，晚到 callback 不會重新保存'
     },
     setItem: () => {
       saved = 'unexpected'
-    }
+    },
   }
   global.window = {
     location: {
       reload: () => {
         reloaded = true
-      }
-    }
+      },
+    },
   }
   key.clearSavedKey()
   key.failMaps('late')
@@ -141,7 +141,7 @@ test('搜尋地址、避免重複搜尋，並選擇餐廳', async () => {
           }),
           searchNearby: () => {
             calls++
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
               resolveSearch = resolve
             })
           },
@@ -151,7 +151,7 @@ test('搜尋地址、避免重複搜尋，並選擇餐廳', async () => {
   }
   places.setQuery('台北 101')
   const request = places.searchRestaurants()
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise(resolve => setImmediate(resolve))
   await places.searchRestaurants()
   assert.equal(calls, 1)
   resolveSearch({
@@ -204,21 +204,41 @@ test('處理空白地址、沒有餐廳、API 錯誤和拒絕定位', async () =
 
 test('URL 座標：正常、零值、邊界、缺漏與惡意輸入', () => {
   const { parseCenter } = load('domain/map/location.ts')
-  assert.deepEqual(parseCenter(new URLSearchParams('lat=25.03&lng=121.56')), { lat: 25.03, lng: 121.56 })
+  assert.deepEqual(parseCenter(new URLSearchParams('lat=25.03&lng=121.56')), {
+    lat: 25.03,
+    lng: 121.56,
+  })
   assert.deepEqual(parseCenter(new URLSearchParams('lat=0&lng=0')), { lat: 0, lng: 0 })
   assert.deepEqual(parseCenter(new URLSearchParams('lat=-90&lng=180')), { lat: -90, lng: 180 })
-  for (const query of ['', 'lat=&lng=0', 'lat=91&lng=0', 'lat=0&lng=-181', 'lat=NaN&lng=0', 'lat=Infinity&lng=0', 'lat=0x10&lng=0', 'lat=0&lat=1&lng=0', 'lat=%20&lng=0']) {
+  for (const query of [
+    '',
+    'lat=&lng=0',
+    'lat=91&lng=0',
+    'lat=0&lng=-181',
+    'lat=NaN&lng=0',
+    'lat=Infinity&lng=0',
+    'lat=0x10&lng=0',
+    'lat=0&lat=1&lng=0',
+    'lat=%20&lng=0',
+  ]) {
     assert.equal(parseCenter(new URLSearchParams(query)), null, query)
   }
 })
 test('定位：成功、拒絕、位置不可用、逾時與不支援', async () => {
   const { getCurrentCenter } = load('domain/map/location.ts')
-  const setNavigator = value => Object.defineProperty(global, 'navigator', { configurable: true, value })
+  const setNavigator = value =>
+    Object.defineProperty(global, 'navigator', { configurable: true, value })
   setNavigator({
-    geolocation: { getCurrentPosition: resolve => resolve({ coords: { latitude: 25, longitude: 121 } }) }
+    geolocation: {
+      getCurrentPosition: resolve => resolve({ coords: { latitude: 25, longitude: 121 } }),
+    },
   })
   assert.deepEqual(await getCurrentCenter(), { lat: 25, lng: 121 })
-  for (const [code, message] of [[1, /權限遭拒/], [2, /無法取得/], [3, /逾時/]]) {
+  for (const [code, message] of [
+    [1, /權限遭拒/],
+    [2, /無法取得/],
+    [3, /逾時/],
+  ]) {
     setNavigator({ geolocation: { getCurrentPosition: (_, reject) => reject({ code }) } })
     await assert.rejects(getCurrentCenter(), message)
   }
@@ -226,7 +246,7 @@ test('定位：成功、拒絕、位置不可用、逾時與不支援', async ()
   await assert.rejects(getCurrentCenter(), /不支援/)
 })
 
-test('Nearby 使用 3 公里與 20 筆限制，共用請求並整理有效餐廳', async () => {
+test('Nearby 使用 1 公里與 20 筆限制，共用請求並整理有效餐廳', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   let calls = 0
   let resolve
@@ -234,14 +254,14 @@ test('Nearby 使用 3 公里與 20 筆限制，共用請求並整理有效餐廳
     Place: {
       searchNearby: options => {
         calls++
-        assert.equal(options.locationRestriction.radius, 3000)
+        assert.equal(options.locationRestriction.radius, 1000)
         assert.equal(options.maxResultCount, 20)
         assert.deepEqual(options.includedTypes, ['restaurant'])
         return new Promise(done => {
           resolve = done
         })
-      }
-    }
+      },
+    },
   }
   const first = fetchNearby(library, { lat: 24, lng: 120 })
   const second = fetchNearby(library, { lat: 24, lng: 120 })
@@ -254,12 +274,12 @@ test('Nearby 使用 3 公里與 20 筆限制，共用請求並整理有效餐廳
         id: 'one',
         displayName: '餐廳',
         rating: 0,
-        location: { toJSON: () => ({ lat: 24, lng: 120 }) }
+        location: { toJSON: () => ({ lat: 24, lng: 120 }) },
       },
       { id: 'missing' },
       { id: 'bad', location: { toJSON: () => ({ lat: 100, lng: 120 }) } },
       { id: 'one', location: { toJSON: () => ({ lat: 24, lng: 120 }) } },
-    ]
+    ],
   })
   const result = await first
   assert.equal(result.length, 1)
@@ -278,8 +298,8 @@ test('Nearby 失敗可重試，空結果正常，不同座標請求互不覆蓋'
           throw new Error('denied')
         }
         return { places: [] }
-      }
-    }
+      },
+    },
   }
   await assert.rejects(fetchNearby(library, { lat: 23, lng: 120 }))
   assert.deepEqual(await fetchNearby(library, { lat: 23, lng: 120 }), [])
@@ -288,8 +308,9 @@ test('Nearby 失敗可重試，空結果正常，不同座標請求互不覆蓋'
   const resolvers = new Map()
   const delayed = {
     Place: {
-      searchNearby: options => new Promise(resolve => resolvers.set(options.locationRestriction.center.lat, resolve))
-    }
+      searchNearby: options =>
+        new Promise(resolve => resolvers.set(options.locationRestriction.center.lat, resolve)),
+    },
   }
   const a = fetchNearby(delayed, { lat: 20, lng: 120 })
   const b = fetchNearby(delayed, { lat: 21, lng: 120 })
@@ -302,24 +323,45 @@ test('Nearby 失敗可重試，空結果正常，不同座標請求互不覆蓋'
 
 const searchError = load('domain/map/searchError.ts')
 test('地址錯誤辨識 code、status 和 Error 訊息，不直接顯示原始文字', () => {
-  for (const cause of [{ code: 'REQUEST_DENIED' }, { status: 'REQUEST_DENIED' }, new Error('Geocoding: REQUEST_DENIED: rejected')]) {
+  for (const cause of [
+    { code: 'REQUEST_DENIED' },
+    { status: 'REQUEST_DENIED' },
+    new Error('Places: REQUEST_DENIED: rejected'),
+  ]) {
     assert.equal(searchError.describeSearchError(cause, null).diagnostic.code, 'REQUEST_DENIED')
-    assert.match(searchError.describeSearchError(cause, null).message, /Geocoding API/)
+    assert.match(searchError.describeSearchError(cause, null).message, /Places API \(New\)/)
   }
-  for (const code of ['ZERO_RESULTS', 'OVER_QUERY_LIMIT', 'OVER_DAILY_LIMIT', 'INVALID_REQUEST', 'UNKNOWN_ERROR', 'ERROR']) {
+  for (const code of [
+    'ZERO_RESULTS',
+    'OVER_QUERY_LIMIT',
+    'OVER_DAILY_LIMIT',
+    'INVALID_REQUEST',
+    'UNKNOWN_ERROR',
+    'ERROR',
+  ]) {
     assert.equal(searchError.describeSearchError(code, null).diagnostic.code, code)
   }
   const failure = searchError.describeSearchError(new Error('private details'), null)
   assert.equal(failure.diagnostic.message, 'private details')
   assert.ok(!failure.message.includes('private details'))
-  assert.equal(searchError.describeSearchError(new Error('定位權限遭拒，請允許定位或改用地址搜尋。'), null, true).message, '定位權限遭拒，請允許定位或改用地址搜尋。')
+  assert.equal(
+    searchError.describeSearchError(
+      new Error('定位權限遭拒，請允許定位或改用地址搜尋。'),
+      null,
+      true,
+    ).message,
+    '定位權限遭拒，請允許定位或改用地址搜尋。',
+  )
 })
 test('診斷訊息遮蔽金鑰和 URL，不包含原始 Error 物件', () => {
   const secret = 'test/key+secret'
-  const cause = new Error(`REQUEST_DENIED ${secret} ${encodeURIComponent(secret)} ${fakeKey} https://example.com/?key=hidden key=another-secret`)
+  const cause = new Error(
+    `REQUEST_DENIED ${secret} ${encodeURIComponent(secret)} ${fakeKey} https://example.com/?key=hidden key=another-secret`,
+  )
   const failure = searchError.describeSearchError(cause, secret)
   const output = JSON.stringify(failure)
-  for (const value of [secret, encodeURIComponent(secret), fakeKey, 'hidden', 'another-secret']) assert.ok(!output.includes(value))
+  for (const value of [secret, encodeURIComponent(secret), fakeKey, 'hidden', 'another-secret'])
+    assert.ok(!output.includes(value))
   assert.equal(failure.diagnostic.code, 'REQUEST_DENIED')
   assert.deepEqual(Object.keys(failure.diagnostic), ['code', 'message'])
 })

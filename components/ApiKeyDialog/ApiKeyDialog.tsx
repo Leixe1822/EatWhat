@@ -18,14 +18,16 @@ export default function ApiKeyDialog() {
         backdrop: {
           sx: theme => ({
             backgroundColor: alpha(theme.palette.secondary.main, 0.45),
-            backdropFilter: 'blur(4px)'
-          })
-        }
+            backdropFilter: 'blur(4px)',
+          }),
+        },
       }}
     >
       {/* 不提供 onClose 或關閉按鈕，Escape 與點背景都不會改變受控 open。 */}
       <DialogTitle id="api-key-gate-title">探索之前，先連上地圖。</DialogTitle>
-      <DialogContent sx={{ pb: 4 }}><KeySettings /></DialogContent>
+      <DialogContent sx={{ pb: 4 }}>
+        <KeySettings />
+      </DialogContent>
     </Dialog>
   )
 }

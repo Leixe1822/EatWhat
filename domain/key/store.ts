@@ -27,50 +27,58 @@ const storage: PersistStorage<Pick<KeyStore, 'key'>> = {
     }
     try {
       localStorage.setItem(name, JSON.stringify(value))
-    }
-    catch {
+    } catch {
       // 延到這次寫入結束後才更新警告；只有還沒有警告時才更新，避免無限重試。
       queueMicrotask(() => {
         const state = useKeyStore.getState()
         if (!state.storageError) {
-          useKeyStore.setState({ storageError: '瀏覽器無法保存金鑰；本次仍可使用，重新整理後可能需要再次輸入。' })
+          useKeyStore.setState({
+            storageError: '瀏覽器無法保存金鑰；本次仍可使用，重新整理後可能需要再次輸入。',
+          })
         }
       })
     }
   },
   removeItem: name => localStorage.removeItem(name),
 }
+
 // create 建立 store；persist 在外面加上保存／還原功能。
-const useKeyStore = create<KeyStore>()(persist((): KeyStore => ({
-  key: null,
-  loading: false,
-  ready: false,
-  error: null,
-  storageError: null,
-  hydrated: false,
-}), {
-  name: 'map-key-store',
-  storage,
-  // Next.js 也會在伺服器 render，所以等 MapsGate 掛載後才存取 localStorage。
-  skipHydration: true,
-  // 只保存金鑰，每次重新整理都必須重新確認 Maps 能否載入。
-  partialize: state => ({ key: state.key }),
-  merge: (saved, current) => {
-    const value = (saved as { key?: unknown } | null)?.key
-    let key: string | null = null
-    if (typeof value === 'string' && value.trim()) {
-      key = value.trim()
-    }
-    return { ...current, key, loading: Boolean(key), ready: false, error: null }
-  },
-  onRehydrateStorage: () => (_state, error) => {
-    const updates: Partial<KeyStore> = { hydrated: true }
-    if (error) {
-      updates.storageError = '無法讀取已保存的金鑰，請重新輸入或清除網站儲存資料。'
-    }
-    useKeyStore.setState(updates)
-  },
-}))
+const useKeyStore = create<KeyStore>()(
+  persist(
+    (): KeyStore => ({
+      key: null,
+      loading: false,
+      ready: false,
+      error: null,
+      storageError: null,
+      hydrated: false,
+    }),
+    {
+      name: 'map-key-store',
+      storage,
+      // Next.js 也會在伺服器 render，所以等 MapsGate 掛載後才存取 localStorage。
+      skipHydration: true,
+      // 只保存金鑰，每次重新整理都必須重新確認 Maps 能否載入。
+      partialize: state => ({ key: state.key }),
+      merge: (saved, current) => {
+        const value = (saved as { key?: unknown } | null)?.key
+        let key: string | null = null
+        if (typeof value === 'string' && value.trim()) {
+          key = value.trim()
+        }
+        return { ...current, key, loading: Boolean(key), ready: false, error: null }
+      },
+      onRehydrateStorage: () => (_state, error) => {
+        const updates: Partial<KeyStore> = { hydrated: true }
+        if (error) {
+          updates.storageError = '無法讀取已保存的金鑰，請重新輸入或清除網站儲存資料。'
+        }
+        useKeyStore.setState(updates)
+      },
+    },
+  ),
+)
+
 export default useKeyStore
 
 export function hydrateKey() {
@@ -91,6 +99,7 @@ export function setKey(value: string) {
   useKeyStore.setState({ key, loading: true, ready: false, error: null })
   return true
 }
+
 export function markMapsReady() {
   const state = useKeyStore.getState()
   // 逾時或授權失敗後，即使晚到 onLoad 也不能把功能重新打開。
@@ -99,15 +108,18 @@ export function markMapsReady() {
   }
   useKeyStore.setState({ loading: false, ready: true })
 }
+
 export function failMaps(message: string) {
   if (!useKeyStore.getState().key) {
     return
   }
   useKeyStore.setState({ loading: false, ready: false, error: message })
 }
+
 export function restartMaps() {
   window.location.reload()
 }
+
 export function clearSavedKey() {
   try {
     // 不在目前 document 更換 key，避免重複載入 Google 全域程式庫。
@@ -115,6 +127,8 @@ export function clearSavedKey() {
     clearing = true
     window.location.reload()
   } catch {
-    useKeyStore.setState({ storageError: '無法清除已保存的金鑰，請在瀏覽器網站設定中手動清除儲存資料。' })
+    useKeyStore.setState({
+      storageError: '無法清除已保存的金鑰，請在瀏覽器網站設定中手動清除儲存資料。',
+    })
   }
 }
