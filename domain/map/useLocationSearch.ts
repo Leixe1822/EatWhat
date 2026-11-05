@@ -9,7 +9,8 @@ import { updateCenter } from './store'
 import { getCurrentCenter, isValidCenter, type Center } from './location'
 
 // 只在 APIProvider 內使用；地址與 Places 選項共用座標驗證及導航。
-export default function useLocationSearch() {
+// 結果頁提供回呼以原地換中心；首頁未提供時維持原本導航。
+export default function useLocationSearch(onLocated?: (center: Center) => void) {
   const places = useMapsLibrary('places')
   const router = useRouter()
   // useState 的值改變時 React 會更新畫面。
@@ -97,6 +98,12 @@ export default function useLocationSearch() {
       }
       if (!isValidCenter(center)) {
         throw new Error('取得的位置不合法，請重新選擇地點。')
+      }
+      if (onLocated) {
+        onLocated(center)
+        locked.current = false
+        setStatus('idle')
+        return
       }
       // Zustand 供元件共享；URL 讓重新整理後仍能還原中心點。
       updateCenter(center)

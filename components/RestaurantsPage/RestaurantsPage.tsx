@@ -8,7 +8,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   IconButton,
   Stack,
@@ -27,6 +26,7 @@ type NearbyExplorerProps = {
   onCenterChange: (center: Center) => void
 }
 
+// 搜尋狀態與資料請求集中在此；MapContainer 只負責既有資料的互動與篩選。
 function NearbyExplorer({ center, onCenterChange }: NearbyExplorerProps) {
   // 同一份 restaurants 同時交給地圖標記和清單，避免資料不同步。
   const { status, restaurants, error, retry } = useNearbyRestaurants(center)
@@ -35,12 +35,9 @@ function NearbyExplorer({ center, onCenterChange }: NearbyExplorerProps) {
   const loadingMessage = status === 'library' ? '正在載入 Places 程式庫…' : '正在搜尋附近餐廳…'
 
   return (
-    <Stack spacing={2}>
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        <Chip label="半徑 3 公里" />
-        <Chip label={`本次結果 ${restaurants.length} 間 · 最多 20 筆`} />
-      </Stack>
-      <Box role="status" aria-live="polite">
+    <Stack spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+      {/* 沒有載入或錯誤訊息時隱藏狀態列，避免留下一段空白。 */}
+      <Box role="status" aria-live="polite" sx={{ display: isLoading || error || isEmpty ? 'block' : 'none', flexShrink: 0 }}>
         {isLoading && (
           <Stack direction="row" spacing={2}>
             <CircularProgress size={22} />
@@ -105,14 +102,18 @@ export default function RestaurantsPage() {
   return (
     <Box
       component="main"
-      sx={{ maxWidth: 1600, mx: 'auto', px: { xs: 1.5, md: 4 }, py: { xs: 2, md: 3 } }}
+      // 桌面以視窗高度配置版面；扣除頁首與內距後，其餘空間交給地圖和清單。
+      sx={{ maxWidth: 1600, mx: 'auto', px: { xs: 1.5, md: 4 }, pt: { xs: 2, md: 3 }, pb: 2,
+        height: { md: '100dvh' }, minHeight: { md: 500 }, display: 'flex', flexDirection: 'column' }}
     >
-      <Stack spacing={2}>
+      {/* minHeight: 0 允許子層縮小，讓長清單在自己的框內捲動。 */}
+      <Stack spacing={2} sx={{ flex: 1, minHeight: 0 }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
           component="header"
           sx={{
+            flexShrink: 0,
             pb: 2,
             borderBottom: '1px solid',
             borderColor: 'divider',

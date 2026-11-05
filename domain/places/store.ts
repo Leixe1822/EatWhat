@@ -9,6 +9,12 @@ export type Restaurant = {
   address: string
   location: google.maps.LatLngLiteral
   rating: number | null
+  userRatingCount?: number | null // 評分人數；缺資料時不補成 0。
+  // 新搜尋提供以下篩選欄位；舊流程未取得時允許省略，不能視為已有資訊。
+  cuisine?: string | null
+  cuisineLabel?: string | null // Google 提供的類型顯示名稱；代碼另存於 cuisine。
+  priceLevel?: string | null
+  openNow?: boolean | null // true：營業中；false：休息中；null／缺值：未知。
   uri: string | null
 }
 export type PlacesStore = {
@@ -28,10 +34,12 @@ const usePlacesStore = create<PlacesStore>(() => ({
 }))
 
 export default usePlacesStore
+// 保存舊流程的輸入文字；此動作本身不發出搜尋。
 export function setQuery(query: string) {
   usePlacesStore.setState({ query })
 }
 
+// 舊版選取會更新地圖中心；新版頁面的選取行為由 MapContainer 管理。
 export function selectRestaurant(id: string) {
   const place = usePlacesStore.getState().restaurants.find(restaurant => restaurant.id === id)
   if (!place) {

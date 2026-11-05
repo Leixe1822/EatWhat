@@ -246,7 +246,8 @@ test('定位：成功、拒絕、位置不可用、逾時與不支援', async ()
   await assert.rejects(getCurrentCenter(), /不支援/)
 })
 
-test('Nearby 使用 1 公里與 20 筆限制，共用請求並整理有效餐廳', async () => {
+// 驗證實際請求參數、同座標共用 Promise，以及重複／無效餐廳的排除。
+test('Nearby 使用 3 公里與 20 筆限制，共用請求並整理有效餐廳', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   let calls = 0
   let resolve
@@ -254,7 +255,7 @@ test('Nearby 使用 1 公里與 20 筆限制，共用請求並整理有效餐廳
     Place: {
       searchNearby: options => {
         calls++
-        assert.equal(options.locationRestriction.radius, 1000)
+        assert.equal(options.locationRestriction.radius, 3000)
         assert.equal(options.maxResultCount, 20)
         assert.deepEqual(options.includedTypes, ['restaurant'])
         return new Promise(done => {
@@ -364,4 +365,47 @@ test('診斷訊息遮蔽金鑰和 URL，不包含原始 Error 物件', () => {
     assert.ok(!output.includes(value))
   assert.equal(failure.diagnostic.code, 'REQUEST_DENIED')
   assert.deepEqual(Object.keys(failure.diagnostic), ['code', 'message'])
+})
+
+// 以固定座標與混合資料測試 AND 條件；包含未知、false、免費與超出半徑的案例。
+test('本地篩選名稱、地址、距離與組合條件，未知不等於休息或免費', () => {
+  const { DEFAULT_FILTERS, filterRestaurants, distanceMeters } = load('domain/places/filters.ts')
+  const center = { lat: 25, lng: 121 }
+  const base = { location: center, rating: null, uri: null }
+  const restaurants = [
+    { ...base, id: 'a', name: 'Cafe A', address: '台北路', cuisine: 'cafe', priceLevel: 'FREE', rating: 4.5, openNow: true },
+    { ...base, id: 'b', name: '小吃', address: '台中路', cuisine: 'restaurant', priceLevel: 'MODERATE', rating: 3, openNow: false },
+    { ...base, id: 'c', name: '未知', address: '台北路' },
+    { ...base, id: 'd', name: '遠方', address: '', location: { lat: 25.04, lng: 121 } },
+  ]
+  // 測試只比較 ID，讓失敗訊息直接指出哪些餐廳被錯誤納入或排除。
+  const ids = filters => filterRestaurants(restaurants, center, { ...DEFAULT_FILTERS, ...filters }).map(r => r.id)
+  assert.deepEqual(ids({}), ['a', 'b', 'c'])
+  assert.deepEqual(ids({ keyword: '  CAFE ' }), ['a'])
+  assert.deepEqual(ids({ keyword: '台北' }), ['a', 'c'])
+  assert.deepEqual(ids({ cuisine: 'cafe', price: 'FREE', rating: 4, opening: 'open' }), ['a'])
+  assert.deepEqual(ids({ opening: 'closed' }), ['b'])
+  assert.deepEqual(ids({ opening: 'unknown', price: 'unknown' }), ['c'])
+  assert.deepEqual(ids({ rating: 4.5, keyword: '小吃' }), [])
+  assert.equal(distanceMeters(center, center), 0)
+  const nearby = [{ ...restaurants[0], location: { lat: 25.01, lng: 121 } }]
+  assert.equal(filterRestaurants(nearby, center, { ...DEFAULT_FILTERS, distance: 1000 }).length, 0)
+  assert.equal(filterRestaurants(nearby, center, DEFAULT_FILTERS).length, 1)
+  assert.equal(DEFAULT_FILTERS.distance, 3000)
+})
+
+// 模擬 Google 回覆，確認 null 和 false 不會因預設值處理而混淆。
+test('Nearby 保留價格與營業狀態未知，也保留已知的 false', async () => {
+  const { fetchNearby } = load('domain/places/nearby.ts')
+  const results = await fetchNearby({ Place: { searchNearby: async options => {
+    for (const field of ['priceLevel', 'primaryType', 'currentOpeningHours']) assert.ok(options.fields.includes(field))
+    return { places: [
+      { id: 'unknown', location: { toJSON: () => ({ lat: 19, lng: 121 }) } },
+      { id: 'closed', location: { toJSON: () => ({ lat: 19, lng: 121 }) }, priceLevel: 'FREE', currentOpeningHours: {}, isOpen: async () => false },
+    ] }
+  } } }, { lat: 19, lng: 121 })
+  assert.equal(results[0].priceLevel, null)
+  assert.equal(results[0].openNow, null)
+  assert.equal(results[1].priceLevel, 'FREE')
+  assert.equal(results[1].openNow, false)
 })

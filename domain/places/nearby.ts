@@ -2,7 +2,7 @@
 import type { Restaurant } from './store'
 import { isValidCenter, type Center } from '@/domain/map/location'
 
-export const SEARCH_RADIUS = 1000 // 公尺，等於 1 公里。
+export const SEARCH_RADIUS = 3000 // 公尺，等於 3 公里。
 export const MAX_RESULTS = 20 // 單次最多 20 筆，不代表範圍內的全部餐廳。
 const CACHE_DURATION = 60000 // 同一中心點的結果保留 60 秒。
 const SEARCH_TIMEOUT = 20000 // 最多等待 20 秒。
@@ -17,7 +17,8 @@ type CachedSearch = {
 // 保存 Promise 可以讓「同座標、同時發生」的搜尋共用一次 API 請求。
 const cache = new Map<string, CachedSearch>()
 
-function convertPlacesToRestaurants(places: google.maps.places.Place[]): Restaurant[] {
+// 將 Google Place 轉為畫面共用資料；排除無效座標與重複 ID，保留缺值。
+async function convertPlacesToRestaurants(places: google.maps.places.Place[]): Promise<Restaurant[]> {
   const restaurants: Restaurant[] = []
   const seenIds = new Set<string>() // Set 用來記錄已加入的餐廳 ID，避免重複。
 
@@ -33,18 +34,29 @@ function convertPlacesToRestaurants(places: google.maps.places.Place[]): Restaur
 
     seenIds.add(place.id)
     // ?? 只在資料是 null 或 undefined 時使用預設值；評分 0 不會被取代。
+    // isOpen 在部分 API 版本不可用；缺資料或計算失敗都保留未知。
+    let openNow: boolean | null = null
+    if (place.currentOpeningHours && typeof place.isOpen === 'function') {
+      try { openNow = (await place.isOpen()) ?? null } catch { /* 保留未知 */ }
+    }
     restaurants.push({
       id: place.id,
       name: place.displayName ?? '未提供名稱',
       address: place.formattedAddress ?? '未提供地址',
       location,
       rating: place.rating ?? null,
+      userRatingCount: place.userRatingCount ?? null,
+      cuisine: place.primaryType ?? null,
+      cuisineLabel: place.primaryTypeDisplayName ?? null,
+      priceLevel: place.priceLevel ?? null,
+      openNow,
       uri: place.googleMapsURI ?? null,
     })
   }
   return restaurants
 }
 
+// 只以搜尋中心區分快取；本地關鍵字與篩選選項不參與 API 請求。
 export function fetchNearby(
   library: google.maps.PlacesLibrary,
   center: Center,
@@ -64,7 +76,9 @@ export function fetchNearby(
   // 這也會把同步拋出的錯誤轉成 Promise 的失敗結果，交給下方 catch 處理。
   const googleRequest = Promise.resolve().then(async () => {
     const response = await library.Place.searchNearby({
-      fields: ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'googleMapsURI'],
+      // 一次取得顯示與篩選所需欄位；營業時間和時區供營業狀態判斷使用。
+      fields: ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'userRatingCount', 'googleMapsURI',
+        'primaryType', 'primaryTypeDisplayName', 'priceLevel', 'currentOpeningHours', 'utcOffsetMinutes'],
       locationRestriction: { center, radius: SEARCH_RADIUS },
       includedTypes: ['restaurant'],
       maxResultCount: MAX_RESULTS,
@@ -93,6 +107,7 @@ export function fetchNearby(
   }
 
   const pendingSearch = waitForResults()
+  // 限制快取數量，探索多個中心點時淘汰最早加入的項目。
   if (cache.size >= MAX_CACHE_ENTRIES) {
     const oldestKey = cache.keys().next().value
     if (oldestKey !== undefined) {
