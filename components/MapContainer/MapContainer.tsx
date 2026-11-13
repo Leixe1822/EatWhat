@@ -4,10 +4,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box, Button, Chip, IconButton, Stack, Typography, useTheme, useMediaQuery } from '@mui/material'
 import { AdvancedMarker, InfoWindow, Map, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
+import CloseIcon from '@mui/icons-material/Close'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import { DEFAULT_FILTERS, filterRestaurants } from '@/domain/places/filters'
+import { DEFAULT_FILTERS, filterRestaurants, type RestaurantFilters } from '@/domain/places/filters'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import ResultsPanel from '@/components/RestaurantsPage/ResultsPanel'
 import useMapStore, { setMap } from '@/domain/map/store'
@@ -56,6 +57,8 @@ function SearchRange({ center, radius }: { center: Center; radius: number }) {
 }
 
 type MapContainerProps = {
+  filters: RestaurantFilters
+  onFiltersChange: (filters: RestaurantFilters) => void
   center: Center
   restaurants: Restaurant[]
   onCenterChange: (center: Center) => void
@@ -65,9 +68,8 @@ type RestaurantSelection = {
   results: Restaurant[] // 記住選取時的資料批次；新搜尋不沿用舊選取。
 }
 
-export default function MapContainer({ center, restaurants, onCenterChange }: MapContainerProps) {
-  // 篩選狀態只留在地圖容器；同一份篩選結果同時驅動清單、筆數與標記。
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+export default function MapContainer({ center, restaurants, onCenterChange, filters, onFiltersChange }: MapContainerProps) {
+  // 篩選狀態由查詢層管理；同一份篩選結果同時驅動清單、筆數與標記。
   const filteredRestaurants = filterRestaurants(restaurants, center, filters)
   const [selection, setSelection] = useState<RestaurantSelection | null>(null)
   // null 表示尚未手動切換：桌面預設展開，手機預設收合。
@@ -95,11 +97,11 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
   }
 
   // 從本次完整結果等機率抽一間，不額外呼叫 API。
-  // 清除篩選，確保抽中的餐廳即使原先被隱藏，也能顯示標記及資訊視窗。
+  // 保留查詢半徑、清除其他篩選，讓抽中的餐廳可見，且不觸發新搜尋。
   function selectRandomRestaurant() {
     if (restaurants.length === 0) return
     const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)]
-    setFilters({ ...DEFAULT_FILTERS })
+    onFiltersChange({ ...DEFAULT_FILTERS, distance: filters.distance })
     selectRestaurant(restaurant)
   }
 
@@ -140,7 +142,7 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
         restaurants={filteredRestaurants}
         allRestaurants={restaurants}
         filters={filters}
-        onFiltersChange={setFilters}
+        onFiltersChange={onFiltersChange}
         selectedId={selectedRestaurant?.id}
         open={panelOpen}
         onSelect={selectRestaurant}
@@ -149,6 +151,11 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
       <Box
         sx={{
           position: 'relative',
+          // 移除 Google 資訊視窗的外層白底、陰影與箭頭，只顯示自訂卡片。
+          // gm-style-* 屬於 Google 產生的樣式名稱，套件更新後須確認外觀仍正常。
+          '& .gm-style-iw-c': { background: 'transparent', boxShadow: 'none', padding: '0 !important' },
+          '& .gm-style-iw-d': { overflow: 'auto !important' },
+          '& .gm-style-iw-tc': { display: 'none' },
           minWidth: 0,
           height: 'var(--panel-height)',
           minHeight: 0,
@@ -216,7 +223,7 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
               />
             </Stack>
           </AdvancedMarker>
-          {/* 範圍圈跟隨距離選單；改半徑只更新圈，不額外呼叫附近搜尋。 */}
+          {/* 範圍圈跟隨距離選單；半徑同時用於附近搜尋。 */}
           <SearchRange center={center} radius={filters.distance} />
           {/* map 把每間餐廳轉成一個標記；key 讓 React 辨認各個項目。 */}
           {filteredRestaurants.map(restaurant => (
@@ -230,8 +237,11 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
               <LocationOnIcon
                 sx={{
                   fontSize: selectedRestaurant?.id === restaurant.id ? 46 : 38,
-                  color: 'secondary.main',
-                  stroke: 'var(--mui-palette-background-paper)',
+                  // 選取餐廳以深橘色區分，米白描邊呼應頁面底色。
+                  color: selectedRestaurant?.id === restaurant.id ? '#C65D32' : 'secondary.main',
+                  stroke: selectedRestaurant?.id === restaurant.id
+                    ? 'var(--mui-palette-background-default)'
+                    : 'var(--mui-palette-background-paper)',
                   strokeWidth: 0.7,
                   display: 'block',
                 }}
@@ -246,7 +256,7 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
               pixelOffset={[0, -40]}
               maxWidth={320}
               ariaLabel={selectedRestaurant.name}
-              headerContent={<Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: 1.5 }}>餐廳資訊</Typography>}
+              headerDisabled
               onClose={() => setSelection(null)}
             >
               {/* 延續品牌的深色邊框與硬陰影，評分以酸橙綠標籤強調。 */}
@@ -266,9 +276,14 @@ export default function MapContainer({ center, restaurants, onCenterChange }: Ma
                   overflowWrap: 'anywhere',
                 }}
               >
-                <Typography component="h2" variant="h6" sx={{ fontWeight: 800, lineHeight: 1.4 }}>
-                  {selectedRestaurant.name}
-                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+                  <Typography component="h2" variant="h6" sx={{ flex: 1, minWidth: 0, fontWeight: 800, lineHeight: 1.4 }}>
+                    {selectedRestaurant.name}
+                  </Typography>
+                  <IconButton size="small" aria-label="關閉餐廳資訊" onClick={() => setSelection(null)} sx={{ color: 'text.primary' }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
                 {/* 評分與營業狀態並排顯示。 */}
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <Chip

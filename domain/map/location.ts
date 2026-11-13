@@ -4,6 +4,7 @@ export type Center = {
   lng: number
 }
 
+// 同時排除 NaN、無限大及超出地理範圍的座標。
 export function isValidCenter(center: Center) {
   const latitudeIsValid = Number.isFinite(center.lat) && Math.abs(center.lat) <= 90
   const longitudeIsValid = Number.isFinite(center.lng) && Math.abs(center.lng) <= 180

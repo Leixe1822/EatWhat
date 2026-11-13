@@ -6,6 +6,7 @@ import APIProviderShell from './APIProvider'
 import ApiKeyDialog from '@/components/ApiKeyDialog/ApiKeyDialog'
 import useKeyStore, { failMaps, markMapsReady, hydrateKey } from '@/domain/key/store'
 
+// Provider 的載入錯誤轉成統一提示，不直接顯示外部錯誤物件。
 function loadError() {
   failMaps(
     'Google Maps 載入失敗，請檢查網路、金鑰、網站來源限制與 Maps JavaScript API 設定，再重新載入重試。',

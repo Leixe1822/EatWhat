@@ -81,6 +81,7 @@ const useKeyStore = create<KeyStore>()(
 
 export default useKeyStore
 
+// 一個頁面生命週期只還原一次，避免重複讀取覆蓋目前狀態。
 export function hydrateKey() {
   if (!useKeyStore.getState().hydrated) {
     void useKeyStore.persist.rehydrate()
@@ -100,6 +101,7 @@ export function setKey(value: string) {
   return true
 }
 
+// 僅在 Maps 正常載入且沒有授權錯誤時開放頁面互動。
 export function markMapsReady() {
   const state = useKeyStore.getState()
   // 逾時或授權失敗後，即使晚到 onLoad 也不能把功能重新打開。
@@ -109,6 +111,7 @@ export function markMapsReady() {
   useKeyStore.setState({ loading: false, ready: true })
 }
 
+// 統一收斂載入、逾時和授權錯誤，讓遮罩與提示同步。
 export function failMaps(message: string) {
   if (!useKeyStore.getState().key) {
     return
@@ -116,10 +119,12 @@ export function failMaps(message: string) {
   useKeyStore.setState({ loading: false, ready: false, error: message })
 }
 
+// Google 全域載入狀態需透過整頁重載重建。
 export function restartMaps() {
   window.location.reload()
 }
 
+// 刪除持久化金鑰後重載；刪除失敗時保留本次狀態並提示。
 export function clearSavedKey() {
   try {
     // 不在目前 document 更換 key，避免重複載入 Google 全域程式庫。

@@ -1,7 +1,8 @@
 'use client'
 
-// 結果面板：顯示篩選控制與餐廳清單，狀態由 MapContainer 統一管理。
-import { DEFAULT_FILTERS, PRICE_LABELS, type RestaurantFilters } from '@/domain/places/filters'
+// 結果面板：顯示篩選控制與清單；篩選狀態在 RestaurantsPage，選取狀態在 MapContainer。
+import { useEffect, useRef } from 'react'
+import { DEFAULT_FILTERS, PRICE_LABELS, getCuisineOptions, type RestaurantFilters } from '@/domain/places/filters'
 import {
   Box,
   Button,
@@ -29,17 +30,40 @@ type ResultsPanelProps = {
 }
 
 type RestaurantListItemProps = {
+  panelOpen: boolean
   restaurant: Restaurant
   selected: boolean
   onSelect: (restaurant: Restaurant) => void
 }
 
 // 單筆餐廳保留原本點選回呼；未知價格與營業狀態不自行推測。
-function RestaurantListItem({ restaurant, selected, onSelect }: RestaurantListItemProps) {
+function RestaurantListItem({ restaurant, selected, panelOpen, onSelect }: RestaurantListItemProps) {
+  const itemRef = useRef<HTMLDivElement>(null)
+
+  // 等清單更新後再捲到選取項；收合時不捲動，重新展開時也會定位。
+  useEffect(() => {
+    if (!selected || !panelOpen) return
+    const frame = requestAnimationFrame(() => {
+      itemRef.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selected, panelOpen])
+  // 分開組合顯示文案，避免在 JSX 裡嵌套多層條件。
+  const priceLabel = restaurant.priceLevel
+    ? PRICE_LABELS[restaurant.priceLevel] ?? '價格未知'
+    : '價格未知'
+  let openingLabel = '營業狀態未知'
+  if (restaurant.openNow === true) openingLabel = '營業中'
+  if (restaurant.openNow === false) openingLabel = '休息中'
   const ratingLabel = restaurant.rating === null ? '尚無評分' : `評分 ${restaurant.rating} / 5`
 
   return (
     <ListItemButton
+      ref={itemRef}
       selected={selected}
       onClick={() => onSelect(restaurant)}
       sx={{
@@ -54,7 +78,7 @@ function RestaurantListItem({ restaurant, selected, onSelect }: RestaurantListIt
     >
       <ListItemText
         primary={restaurant.name}
-        secondary={`${ratingLabel} · ${restaurant.priceLevel ? PRICE_LABELS[restaurant.priceLevel] ?? '價格未知' : '價格未知'} · ${restaurant.openNow == null ? '營業狀態未知' : restaurant.openNow ? '營業中' : '休息中'} · ${restaurant.address}`}
+        secondary={`${ratingLabel} · ${priceLabel} · ${openingLabel} · ${restaurant.address}`}
         slotProps={{
           primary: { sx: { fontWeight: 700 } },
           secondary: { sx: { overflowWrap: 'anywhere' } },
@@ -64,7 +88,7 @@ function RestaurantListItem({ restaurant, selected, onSelect }: RestaurantListIt
   )
 }
 
-// 下拉選單只篩選已取得的餐廳，不更改搜尋中心。
+// 距離選單會通知父層重新查詢；其餘條件只篩選現有資料，皆不改變搜尋中心。
 export default function ResultsPanel({
   restaurants,
   selectedId,
@@ -76,8 +100,8 @@ export default function ResultsPanel({
   onRandomSelect,
 }: ResultsPanelProps) {
   const isEmpty = restaurants.length === 0
-  // 以類型代碼去重；選項來自原始結果，避免篩選後可選類型跟著消失。
-  const cuisines = [...new Map(allRestaurants.filter(r => r.cuisine).map(r => [r.cuisine!, r.cuisineLabel ?? r.cuisine!])).entries()]
+  // 固定分組顯示本次結果數量；沒有餐廳的分類仍保留，但不能選取。
+  const cuisines = getCuisineOptions(allRestaurants)
   // 泛型確保欄位與值的型別一致；每次只更新一個條件，保留其餘選擇。
   function updateFilter<K extends keyof RestaurantFilters>(key: K, value: RestaurantFilters[K]) {
     onFiltersChange({ ...filters, [key]: value })
@@ -89,7 +113,8 @@ export default function ResultsPanel({
       id="restaurant-results"
       aria-label="搜尋結果面板"
       sx={{
-        display: open ? 'block' : 'none',
+        display: open ? 'flex' : 'none',
+        flexDirection: 'column',
         // 與地圖共用父層的高度變數，結果少時也保持等高。
         height: 'var(--panel-height)',
         minHeight: 0,
@@ -99,38 +124,57 @@ export default function ResultsPanel({
         overflow: 'hidden',
       }}
     >
-      {/* 內容超出時只捲動面板內部，避免把外框和地圖一起撐高。 */}
-      <Box sx={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', p: 1.5 }}>
-        <Stack spacing={1.5} sx={{ mb: 2 }}>
+      {/* 控制區不參與捲動，隨機按鈕、篩選與結果筆數固定在上方。 */}
+        <Stack spacing={1.5} sx={{ flexShrink: 0, p: 1.5 }}>
           <Button
             variant="contained"
             startIcon={<ShuffleIcon />}
             onClick={onRandomSelect}
+            // 只調整隨機按鈕：滑入時向下位移並縮短陰影，呈現按壓感。
+            sx={{
+              '@media (hover: hover)': {
+                '&:hover:not(.Mui-disabled)': {
+                  transform: 'translateY(2px)',
+                  boxShadow: '1px 1px 0 var(--mui-palette-divider)',
+                },
+              },
+              '&:active:not(.Mui-disabled)': {
+                transform: 'translateY(3px)',
+                boxShadow: 'none',
+              },
+              '@media (prefers-reduced-motion: reduce)': {
+                '&&:hover, &&:active': { transform: 'none' },
+              },
+            }}
             disabled={allRestaurants.length === 0}
             fullWidth
           >
             隨機選一家
           </Button>
           <Typography variant="caption" color="text.secondary">
-            從本次 {allRestaurants.length} 間餐廳中抽選，並重設篩選條件。
+            從本次 {allRestaurants.length} 間餐廳中抽選，並重設其他篩選條件。
           </Typography>
           {/* 不使用浮動 label；displayEmpty 保留空值選項文字，aria-label 提供無障礙名稱。 */}
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
             <TextField select size="small"
               slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': '距離' } } }} value={filters.distance} onChange={e => updateFilter('distance', Number(e.target.value))}>
-              {/* 選項以公尺保存、公里顯示，最大值不超過本次查詢半徑。 */}
+              {/* 選項以公尺保存、公里顯示；選定的值會成為新的 API 查詢半徑。 */}
               {[500, 1000, 2000, DEFAULT_FILTERS.distance].map(distance => <MenuItem key={distance} value={distance}>{distance / 1000} 公里內</MenuItem>)}
             </TextField>
             <TextField select size="small"
               slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': '美食類型' } } }} value={filters.cuisine} onChange={e => updateFilter('cuisine', e.target.value)}>
-              <MenuItem value="">全部類型</MenuItem>
-              {cuisines.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+              <MenuItem value="">全部類型（{allRestaurants.length}）</MenuItem>
+              {cuisines.map(({ value, label, count }) => (
+                <MenuItem key={value} value={value} disabled={count === 0}>
+                  {label}（{count}）
+                </MenuItem>
+              ))}
             </TextField>
             <TextField select size="small"
               slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': '價格' } } }} value={filters.price} onChange={e => updateFilter('price', e.target.value)}>
               <MenuItem value="">全部價格</MenuItem>
-              {/* 僅從選單移除免費，不改寫 Google 回傳的餐廳價格資料。 */}
-              {Object.entries(PRICE_LABELS).filter(([value]) => value !== 'FREE').map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+              {/* 僅從選單移除免費與 $$$$，不改寫 Google 回傳的餐廳價格資料。 */}
+              {Object.entries(PRICE_LABELS).filter(([value]) => value !== 'FREE' && value !== 'VERY_EXPENSIVE').map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
               <MenuItem value="unknown">價格未知</MenuItem>
             </TextField>
             <TextField select size="small"
@@ -145,12 +189,38 @@ export default function ResultsPanel({
               <MenuItem value="closed">休息中</MenuItem>
               <MenuItem value="unknown">狀態未知</MenuItem>
             </TextField>
-            {/* 恢復所有餐廳篩選預設值，不重新查詢 API。 */}
-            <Button variant="outlined" onClick={() => onFiltersChange({ ...DEFAULT_FILTERS })}>重新選擇</Button>
+            {/* 恢復預設條件；若半徑改回 3 公里，會重新查詢 API。 */}
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => onFiltersChange({ ...DEFAULT_FILTERS })}
+              // 與 small 下拉選單同高，寬度沿用相同的 Grid 欄位。
+              sx={{
+                height: 40,
+                minHeight: 40,
+                px: 1.5,
+                py: 0,
+                fontSize: '1rem',
+                borderRadius: 1,
+                boxShadow: 'none',
+                '@media (hover: hover)': {
+                  '&:hover:not(.Mui-disabled)': { transform: 'none' },
+                },
+              }}
+            >
+              重新選擇
+            </Button>
           </Box>
           {/* 筆數使用篩選後陣列；aria-live 讓輔助工具得知結果更新。 */}
           <Typography component="h1" variant="h6" aria-live="polite">搜尋結果（{restaurants.length}）</Typography>
         </Stack>
+        {/* 只讓餐廳結果佔用剩餘高度並捲動；minHeight: 0 避免清單撐開面板。 */}
+        <Box
+          role="region"
+          aria-label="可捲動的餐廳結果"
+          tabIndex={0}
+          sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', px: 1.5, pb: 1.5 }}
+        >
           {/* 區分「沒有搜尋資料」與「有資料但不符合篩選」兩種情況。 */}
           {isEmpty && (
             <Typography sx={{ p: 1 }} color="text.secondary">
@@ -163,6 +233,7 @@ export default function ResultsPanel({
                 key={restaurant.id}
                 restaurant={restaurant}
                 selected={selectedId === restaurant.id}
+                panelOpen={open}
                 onSelect={onSelect}
               />
             ))}

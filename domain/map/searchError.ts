@@ -22,6 +22,7 @@ const localMessages = new Set([
   '定位失敗，請改用地址搜尋。',
 ])
 
+// 回傳兩份訊息：畫面用的固定文案，以及已遮蔽敏感資訊的開發診斷。
 export function describeSearchError(cause: unknown, apiKey: string | null, locating = false) {
   // catch 接到的值不一定是 Error，也可能是字串或一般物件。
   let record: Record<string, unknown> = {}

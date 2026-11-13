@@ -1,4 +1,4 @@
-// 保留的舊版餐廳流程（1 公里搜尋及隨機選餐廳）；目前第二頁使用 useNearbyRestaurants（3 公里）。Restaurant 型別仍共用。
+// 保留的舊版餐廳流程（1 公里搜尋及隨機選餐廳）；目前第二頁使用 useNearbyRestaurants（預設 3 公里，可選半徑）。Restaurant 型別仍共用。
 import { create } from 'zustand'
 import { updateCenter } from '@/domain/map/store'
 

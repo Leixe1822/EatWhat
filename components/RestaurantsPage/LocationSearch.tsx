@@ -6,6 +6,7 @@ import useLocationSearch from '@/domain/map/useLocationSearch'
 import usePlaceAutocomplete from '@/domain/map/usePlaceAutocomplete'
 import type { Center } from '@/domain/map/location'
 
+// 保留供日後使用，目前 ResultsPanel 未掛載此元件。
 // 外觀保留結果頁的圓角輸入框，搜尋邏輯與首頁共用，不在既有餐廳內比對。
 export default function LocationSearch({ onLocated }: { onLocated: (center: Center) => void }) {
   const { query, setQuery, status, error, locate } = useLocationSearch(onLocated)
@@ -13,6 +14,7 @@ export default function LocationSearch({ onLocated }: { onLocated: (center: Cent
   const busy = status !== 'idle'
   const autocomplete = usePlaceAutocomplete(query, !busy && !selectedPlace)
 
+  // Enter 送出才取得座標；選取建議時先保存 Google 地點物件。
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     void locate(false, selectedPlace ?? undefined)

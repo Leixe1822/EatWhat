@@ -1,3 +1,4 @@
+// 保留統一匯出入口，實際的預設視角定義在 domain/map/config.ts。
 export { DEFAULT_CAMERA } from '@/domain/map/config'
 // Map ID 不是 API Key，可公開；必須綁定已發布的 Cloud 地圖樣式才能隱藏 POI。
 export const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID?.trim() || 'DEMO_MAP_ID'

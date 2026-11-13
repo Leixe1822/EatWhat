@@ -9,7 +9,7 @@ import { updateCenter } from './store'
 import { getCurrentCenter, isValidCenter, type Center } from './location'
 
 // 只在 APIProvider 內使用；地址與 Places 選項共用座標驗證及導航。
-// 結果頁提供回呼以原地換中心；首頁未提供時維持原本導航。
+// 呼叫端可提供回呼以原地換中心；目前首頁未提供回呼，成功後會導航。
 export default function useLocationSearch(onLocated?: (center: Center) => void) {
   const places = useMapsLibrary('places')
   const router = useRouter()

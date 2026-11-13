@@ -1,7 +1,7 @@
 'use client'
 
 // 第二頁互動入口：驗證 URL 座標、同步 store，再啟動附近餐廳搜尋。
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import {
@@ -17,6 +17,7 @@ import { setSearchCenter } from '@/domain/map/store'
 import useKeyStore from '@/domain/key/store'
 import { parseCenter, type Center } from '@/domain/map/location'
 import useNearbyRestaurants from '@/domain/places/useNearbyRestaurants'
+import { DEFAULT_FILTERS } from '@/domain/places/filters'
 import Logo from '@/components/Logo'
 import MapContainer from '@/components/MapContainer'
 
@@ -29,7 +30,9 @@ type NearbyExplorerProps = {
 // 搜尋狀態與資料請求集中在此；MapContainer 只負責既有資料的互動與篩選。
 function NearbyExplorer({ center, onCenterChange }: NearbyExplorerProps) {
   // 同一份 restaurants 同時交給地圖標記和清單，避免資料不同步。
-  const { status, restaurants, error, retry } = useNearbyRestaurants(center)
+  // 距離由查詢層管理，選單、API 半徑與地圖範圍圈共用同一個值。
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const { status, restaurants, error, retry } = useNearbyRestaurants(center, filters.distance)
   const isLoading = status === 'library' || status === 'searching'
   const isEmpty = status === 'success' && restaurants.length === 0
   const loadingMessage = status === 'library' ? '正在載入 Places 程式庫…' : '正在搜尋附近餐廳…'
@@ -53,7 +56,7 @@ function NearbyExplorer({ center, onCenterChange }: NearbyExplorerProps) {
           <Alert severity="info">這次沒有取得餐廳結果，請拖曳中心標記選擇其他地點。</Alert>
         )}
       </Box>
-      <MapContainer center={center} restaurants={restaurants} onCenterChange={onCenterChange} />
+      <MapContainer filters={filters} onFiltersChange={setFilters} center={center} restaurants={restaurants} onCenterChange={onCenterChange} />
     </Stack>
   )
 }
