@@ -101,8 +101,10 @@ export default function LandingPage() {
     <Box
       sx={{
         minHeight: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
         px: { xs: 2, sm: 4, md: 6 },
-        py: { xs: 3, md: 4 },
+        py: { xs: 2, md: 3 },
         maxWidth: 1280,
         mx: 'auto',
       }}
@@ -114,7 +116,8 @@ export default function LandingPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 2,
-          pb: 3,
+          flexShrink: 0,
+          pb: { xs: 2, md: 3 },
           borderBottom: '1px solid',
           borderColor: 'divider',
           mb: 0,
@@ -129,7 +132,8 @@ export default function LandingPage() {
           金鑰設定
         </Button>
       </Stack>
-      <Box component="main">
+      {/* 主內容使用頁首以外的空間置中，不再重複加上視窗高度。 */}
+      <Box component="main" sx={{ flex: 1, display: 'flex', alignItems: 'center', width: '100%' }}>
         {ready ? (
           <Explorer />
         ) : (

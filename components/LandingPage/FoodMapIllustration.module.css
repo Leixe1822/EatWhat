@@ -1,0 +1,23 @@
+.illustration {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 位移幅度小，搭配不同延遲，讓圖釘緩慢錯開浮動。 */
+.pin {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+/* 尊重使用者的減少動態效果設定，保留靜態插畫。 */
+@media (prefers-reduced-motion: reduce) {
+  .pin { animation: none; }
+}

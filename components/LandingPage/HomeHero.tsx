@@ -2,6 +2,7 @@
 
 // 首頁展示元件：負責排版與表單；透過 props 接收資料與事件，不直接呼叫 Google。
 import type { ComponentProps, ReactNode, SubmitEvent } from 'react'
+import FoodMapIllustration from './FoodMapIllustration'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
 import {
   Autocomplete,
@@ -27,10 +28,16 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
     <Grid
       container
       spacing={{ xs: 4, md: 3, lg: 5 }}
-      sx={{ alignItems: 'center', py: { xs: 4, md: 4 }, minHeight: { md: 'calc(100svh - 130px)' } }}
+      sx={{ alignItems: 'center', justifyContent: 'center', width: '100%', py: { xs: 3, md: 3 } }}
     >
       <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
-        <Stack spacing={{ xs: 2.5, md: 3 }}>
+        <Stack spacing={{ xs: 2.5, md: 3 }} sx={{
+          '@media (max-width: 767.98px)': {
+            maxWidth: 520, mx: 'auto',
+            '& > h1, & > p': { textAlign: 'center' },
+            '& > .MuiChip-root': { alignSelf: 'center' },
+          },
+        }}>
           <Chip
             label="✳ FIND YOUR NEXT BITE"
             sx={{
@@ -66,10 +73,12 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
           )}
         </Stack>
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+      <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, '@media (max-width: 767.98px)': { display: 'none' } }}>
         <Box
           sx={{
             bgcolor: 'primary.main',
+            position: 'relative',
+            overflow: 'hidden',
             border: '3px solid',
             borderColor: 'divider',
             borderRadius: { xs: '28px', sm: '34px' },
@@ -83,7 +92,9 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
             maxWidth: { xs: 600, md: 'none' },
             mx: 'auto',
           }}
-        ></Box>
+        >
+          <FoodMapIllustration />
+        </Box>
       </Grid>
     </Grid>
   )

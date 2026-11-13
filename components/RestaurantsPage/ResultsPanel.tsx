@@ -19,6 +19,8 @@ import ShuffleIcon from '@mui/icons-material/Shuffle'
 import type { Restaurant } from '@/domain/places/store'
 
 type ResultsPanelProps = {
+  listVisible?: boolean
+  mobile?: boolean
   onRandomSelect: () => void
   restaurants: Restaurant[] // 已套用條件的清單，也用來計算畫面筆數。
   selectedId?: string
@@ -78,7 +80,7 @@ function RestaurantListItem({ restaurant, selected, panelOpen, onSelect }: Resta
     >
       <ListItemText
         primary={restaurant.name}
-        secondary={`${ratingLabel} · ${priceLabel} · ${openingLabel} · ${restaurant.address}`}
+        secondary={[restaurant.rating !== null && ratingLabel, restaurant.cuisineLabel, restaurant.priceLevel && priceLabel, restaurant.openNow != null && openingLabel, restaurant.address].filter(Boolean).join(' · ')}
         slotProps={{
           primary: { sx: { fontWeight: 700 } },
           secondary: { sx: { overflowWrap: 'anywhere' } },
@@ -90,6 +92,8 @@ function RestaurantListItem({ restaurant, selected, panelOpen, onSelect }: Resta
 
 // 距離選單會通知父層重新查詢；其餘條件只篩選現有資料，皆不改變搜尋中心。
 export default function ResultsPanel({
+  mobile = false,
+  listVisible = true,
   restaurants,
   selectedId,
   open,
@@ -116,11 +120,12 @@ export default function ResultsPanel({
         display: open ? 'flex' : 'none',
         flexDirection: 'column',
         // 與地圖共用父層的高度變數，結果少時也保持等高。
-        height: 'var(--panel-height)',
+        height: mobile ? '100%' : 'var(--panel-height)',
+        flex: mobile ? 1 : undefined,
         minHeight: 0,
-        border: '2px solid',
+        border: mobile ? 0 : '2px solid',
         borderColor: 'divider',
-        borderRadius: '24px',
+        borderRadius: mobile ? 0 : '24px',
         overflow: 'hidden',
       }}
     >
@@ -132,6 +137,7 @@ export default function ResultsPanel({
             onClick={onRandomSelect}
             // 只調整隨機按鈕：滑入時向下位移並縮短陰影，呈現按壓感。
             sx={{
+              display: mobile ? 'none' : undefined,
               '@media (hover: hover)': {
                 '&:hover:not(.Mui-disabled)': {
                   transform: 'translateY(2px)',
@@ -151,11 +157,11 @@ export default function ResultsPanel({
           >
             隨機選一家
           </Button>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" sx={{ display: mobile ? 'none' : undefined }}>
             從本次 {allRestaurants.length} 間餐廳中抽選，並重設其他篩選條件。
           </Typography>
           {/* 不使用浮動 label；displayEmpty 保留空值選項文字，aria-label 提供無障礙名稱。 */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
+          <Box sx={{ display: mobile ? 'flex' : 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5, overflowX: mobile ? 'auto' : undefined, py: 0.5, '& > *': mobile ? { flexShrink: 0, minWidth: 128 } : {}, '& .MuiInputBase-root': mobile ? { minHeight: 44 } : {} }}>
             <TextField select size="small"
               slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': '距離' } } }} value={filters.distance} onChange={e => updateFilter('distance', Number(e.target.value))}>
               {/* 選項以公尺保存、公里顯示；選定的值會成為新的 API 查詢半徑。 */}
@@ -196,8 +202,8 @@ export default function ResultsPanel({
               onClick={() => onFiltersChange({ ...DEFAULT_FILTERS })}
               // 與 small 下拉選單同高，寬度沿用相同的 Grid 欄位。
               sx={{
-                height: 40,
-                minHeight: 40,
+                height: mobile ? 44 : 40,
+                minHeight: mobile ? 44 : 40,
                 px: 1.5,
                 py: 0,
                 fontSize: '1rem',
@@ -210,9 +216,10 @@ export default function ResultsPanel({
             >
               重新選擇
             </Button>
+            {mobile && <Button onClick={onRandomSelect} disabled={!allRestaurants.length} sx={{ minHeight: 44 }}>隨機選一家</Button>}
           </Box>
           {/* 筆數使用篩選後陣列；aria-live 讓輔助工具得知結果更新。 */}
-          <Typography component="h1" variant="h6" aria-live="polite">搜尋結果（{restaurants.length}）</Typography>
+          <Typography component="h1" variant="h6" aria-live="polite" sx={{ display: mobile ? 'none' : undefined }}>搜尋結果（{restaurants.length}）</Typography>
         </Stack>
         {/* 只讓餐廳結果佔用剩餘高度並捲動；minHeight: 0 避免清單撐開面板。 */}
         <Box
@@ -233,7 +240,7 @@ export default function ResultsPanel({
                 key={restaurant.id}
                 restaurant={restaurant}
                 selected={selectedId === restaurant.id}
-                panelOpen={open}
+                panelOpen={open && listVisible}
                 onSelect={onSelect}
               />
             ))}
