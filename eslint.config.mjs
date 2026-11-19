@@ -1,3 +1,4 @@
+// 程式碼檢查入口：合併框架與 TypeScript 規則，排除建置產物。
 import { defineConfig, globalIgnores } from 'eslint/config'
 import nextVitals from 'eslint-config-next/core-web-vitals'
 import nextTs from 'eslint-config-next/typescript'

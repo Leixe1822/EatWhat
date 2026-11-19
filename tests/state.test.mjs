@@ -8,6 +8,7 @@ import { createRequire } from 'node:module'
 import ts from 'typescript'
 const externalRequire = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// 模組快取讓測試共用與應用相同的 store 實例；以下測試依序設定所需狀態。
 const cache = new Map()
 // 測試載入器：將 TypeScript 轉為 Node 可執行的 CommonJS，不需要額外測試套件。
 function load(relative) {
@@ -40,6 +41,7 @@ const map = load('domain/map/store.ts')
 // 只有測試用字串，不是真正的 Google 金鑰。
 const fakeKey = 'AIza' + 'x'.repeat(35)
 
+// 金鑰生命週期：驗證保存、還原、晚到錯誤及清除後不可重新寫入。
 test('persist 只保存 key，hydration 重新驗證且不能同頁換 key', () => {
   let saved = null
   global.localStorage = {
@@ -129,6 +131,7 @@ test('更新搜尋中心不會移動地圖或重設縮放', () => {
   assert.deepEqual(map.default.getState().center, { lat: 25, lng: 121 })
   map.setMap(null)
 })
+// 舊版搜尋流程：以可手動完成的 Promise 檢查重複提交保護。
 test('搜尋地址、避免重複搜尋，並選擇餐廳', async () => {
   let resolveSearch
   let calls = 0
@@ -202,6 +205,7 @@ test('處理空白地址、沒有餐廳、API 錯誤和拒絕定位', async () =
   assert.match(places.default.getState().error, /定位權限遭拒/)
 })
 
+// 座標輸入邊界：URL 與定位都不接受無效或不完整的位置。
 test('URL 座標：正常、零值、邊界、缺漏與惡意輸入', () => {
   const { parseCenter } = load('domain/map/location.ts')
   assert.deepEqual(parseCenter(new URLSearchParams('lat=25.03&lng=121.56')), {
@@ -247,6 +251,7 @@ test('定位：成功、拒絕、位置不可用、逾時與不支援', async ()
 })
 
 // 驗證實際請求參數、同座標共用 Promise，以及重複／無效餐廳的排除。
+// 新版資料服務：檢查請求參數、資料轉換、快取與失敗處理。
 test('Nearby 使用 3 公里與 20 筆限制，共用請求並整理有效餐廳', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   let calls = 0
@@ -373,8 +378,26 @@ test('本地篩選名稱、地址、距離與組合條件，未知不等於休�
   const center = { lat: 25, lng: 121 }
   const base = { location: center, rating: null, uri: null }
   const restaurants = [
-    { ...base, id: 'a', name: 'Cafe A', address: '台北路', cuisine: 'cafe', priceLevel: 'FREE', rating: 4.5, openNow: true },
-    { ...base, id: 'b', name: '小吃', address: '台中路', cuisine: 'restaurant', priceLevel: 'MODERATE', rating: 3, openNow: false },
+    {
+      ...base,
+      id: 'a',
+      name: 'Cafe A',
+      address: '台北路',
+      cuisine: 'cafe',
+      priceLevel: 'FREE',
+      rating: 4.5,
+      openNow: true
+    },
+    {
+      ...base,
+      id: 'b',
+      name: '小吃',
+      address: '台中路',
+      cuisine: 'restaurant',
+      priceLevel: 'MODERATE',
+      rating: 3,
+      openNow: false
+    },
     { ...base, id: 'c', name: '未知', address: '台北路' },
     { ...base, id: 'd', name: '遠方', address: '', location: { lat: 25.04, lng: 121 } },
   ]
@@ -397,19 +420,32 @@ test('本地篩選名稱、地址、距離與組合條件，未知不等於休�
 // 模擬 Google 回覆，確認 null 和 false 不會因預設值處理而混淆。
 test('Nearby 保留價格與營業狀態未知，也保留已知的 false', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
-  const results = await fetchNearby({ Place: { searchNearby: async options => {
-    for (const field of ['priceLevel', 'primaryType', 'currentOpeningHours']) assert.ok(options.fields.includes(field))
-    return { places: [
-      { id: 'unknown', location: { toJSON: () => ({ lat: 19, lng: 121 }) } },
-      { id: 'closed', location: { toJSON: () => ({ lat: 19, lng: 121 }) }, priceLevel: 'FREE', currentOpeningHours: { periods: [] }, utcOffsetMinutes: 480 },
-    ] }
-  } } }, { lat: 19, lng: 121 })
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async options => {
+        for (const field of ['priceLevel', 'primaryType', 'currentOpeningHours']) assert.ok(options.fields.includes(field))
+        return {
+          places: [
+            { id: 'unknown', location: { toJSON: () => ({ lat: 19, lng: 121 }) } },
+            {
+              id: 'closed',
+              location: { toJSON: () => ({ lat: 19, lng: 121 }) },
+              priceLevel: 'FREE',
+              currentOpeningHours: { periods: [] },
+              utcOffsetMinutes: 480
+            },
+          ]
+        }
+      }
+    }
+  }, { lat: 19, lng: 121 })
   assert.equal(results[0].priceLevel, null)
   assert.equal(results[0].openNow, null)
   assert.equal(results[1].priceLevel, 'FREE')
   assert.equal(results[1].openNow, false)
 })
 
+// 分類與場所排除：確認分類只依明確代碼，不把未知資料當成已知。
 test('固定料理分組合併細分類，保留零筆選項並將未知類型歸入其他', () => {
   const { getCuisineOptions, getCuisineGroup, filterRestaurants, DEFAULT_FILTERS } = load('domain/places/filters.ts')
   const center = { lat: 25, lng: 121 }
@@ -430,17 +466,23 @@ test('固定料理分組合併細分類，保留零筆選項並將未知類型�
 test('Nearby 排除婚宴及飯店類型，保留一般餐廳且不以店名猜測', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   const location = { toJSON: () => ({ lat: 18, lng: 121 }) }
-  const results = await fetchNearby({ Place: { searchNearby: async options => {
-    assert.ok(options.fields.includes('types'))
-    return { places: [
-      { id: 'wedding', location, primaryType: 'wedding_venue' },
-      { id: 'banquet', location, primaryType: 'banquet_hall' },
-      { id: 'hotel', location, primaryType: 'hotel' },
-      { id: 'mixed', location, primaryType: 'restaurant', types: ['restaurant', 'lodging'] },
-      { id: 'normal', location, primaryType: 'chinese_restaurant', displayName: '家常飯店' },
-      { id: 'unknown', location },
-    ] }
-  } } }, { lat: 18, lng: 121 })
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async options => {
+        assert.ok(options.fields.includes('types'))
+        return {
+          places: [
+            { id: 'wedding', location, primaryType: 'wedding_venue' },
+            { id: 'banquet', location, primaryType: 'banquet_hall' },
+            { id: 'hotel', location, primaryType: 'hotel' },
+            { id: 'mixed', location, primaryType: 'restaurant', types: ['restaurant', 'lodging'] },
+            { id: 'normal', location, primaryType: 'chinese_restaurant', displayName: '家常飯店' },
+            { id: 'unknown', location },
+          ]
+        }
+      }
+    }
+  }, { lat: 18, lng: 121 })
   assert.deepEqual(results.map(r => r.id), ['normal', 'unknown'])
 })
 
@@ -465,23 +507,39 @@ test('料理分組採指定順序，火鍋與燒烤獨立分類', () => {
 test('Nearby 補排除僅標為餐廳的婚宴場所，避免泛稱誤判', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   const names = ['幸福婚宴會館', '婚禮莊園', '宴會廳', 'Wedding Venue', 'Grand Banquet Hall', '家常飯店', '美食會館', '宴客餐廳']
-  const results = await fetchNearby({ Place: { searchNearby: async () => ({ places: [
-    ...names.map((displayName, index) => ({
-      id: String(index), displayName, primaryType: 'restaurant',
-      location: { toJSON: () => ({ lat: 17, lng: 121 }) },
-    })),
-    { id: 'label', displayName: '幸福莊園', primaryType: 'restaurant', primaryTypeDisplayName: '婚宴場地', location: { toJSON: () => ({ lat: 17, lng: 121 }) } },
-  ] }) } }, { lat: 17, lng: 121 })
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async () => ({
+        places: [
+          ...names.map((displayName, index) => ({
+            id: String(index), displayName, primaryType: 'restaurant',
+            location: { toJSON: () => ({ lat: 17, lng: 121 }) },
+          })),
+          {
+            id: 'label',
+            displayName: '幸福莊園',
+            primaryType: 'restaurant',
+            primaryTypeDisplayName: '婚宴場地',
+            location: { toJSON: () => ({ lat: 17, lng: 121 }) }
+          },
+        ]
+      })
+    }
+  }, { lat: 17, lng: 121 })
   assert.deepEqual(results.map(r => r.name), ['家常飯店', '美食會館', '宴客餐廳'])
 })
 
 test('Nearby 按選定半徑查詢，切回相同半徑仍可強制重新請求', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   const radii = []
-  const library = { Place: { searchNearby: async options => {
-    radii.push(options.locationRestriction.radius)
-    return { places: [] }
-  } } }
+  const library = {
+    Place: {
+      searchNearby: async options => {
+        radii.push(options.locationRestriction.radius)
+        return { places: [] }
+      }
+    }
+  }
   const center = { lat: 16, lng: 121 }
   for (const radius of [500, 1000, 2000, 3000, 500]) await fetchNearby(library, center, radius, true)
   assert.deepEqual(radii, [500, 1000, 2000, 3000, 500])
@@ -490,21 +548,26 @@ test('Nearby 按選定半徑查詢，切回相同半徑仍可強制重新請求'
   await assert.rejects(fetchNearby(library, center, -1), /無效搜尋半徑/)
 })
 
+// 補查策略：驗證去重、上限與失敗降級，不用真實 Google 配額。
 test('Nearby 補查排除後的缺額，去重、維持半徑並滿 20 筆停止', async () => {
   const { fetchNearby } = load('domain/places/nearby.ts')
   const center = { lat: 15, lng: 121 }
   const place = (id, extra = {}) => ({ id, location: { toJSON: () => center }, ...extra })
   let calls = 0
-  const results = await fetchNearby({ Place: { searchNearby: async request => {
-    calls++
-    assert.equal(request.locationRestriction.radius, 500)
-    assert.deepEqual(request.locationRestriction.center, center)
-    assert.ok(request.excludedTypes.includes('hotel'))
-    assert.ok(request.excludedTypes.includes('wedding_venue'))
-    if (calls === 1) return { places: Array.from({ length: 20 }, (_, i) => place(String(i), i < 3 ? { primaryType: 'hotel' } : {})) }
-    assert.ok(request.includedPrimaryTypes.length)
-    return { places: [place('3'), place('20'), place('21'), place('22'), place('23')] }
-  } } }, center, 500)
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async request => {
+        calls++
+        assert.equal(request.locationRestriction.radius, 500)
+        assert.deepEqual(request.locationRestriction.center, center)
+        assert.ok(request.excludedTypes.includes('hotel'))
+        assert.ok(request.excludedTypes.includes('wedding_venue'))
+        if (calls === 1) return { places: Array.from({ length: 20 }, (_, i) => place(String(i), i < 3 ? { primaryType: 'hotel' } : {})) }
+        assert.ok(request.includedPrimaryTypes.length)
+        return { places: [place('3'), place('20'), place('21'), place('22'), place('23')] }
+      }
+    }
+  }, center, 500)
   assert.equal(calls, 2)
   assert.equal(results.length, 20)
   assert.equal(new Set(results.map(r => r.id)).size, 20)
@@ -528,13 +591,89 @@ test('Nearby 補查最多三次，補查錯誤仍保留有效餐廳', async () =
   assert.equal(calls, 2)
 })
 
+test('料理搜尋傳入主要類型、隔離快取，切回全部時不沿用類別限制', async () => {
+  const { fetchNearby } = load('domain/places/nearby.ts')
+  const center = { lat: 13, lng: 121 }
+  const requests = []
+  const library = {
+    Place: {
+      searchNearby: async request => {
+        requests.push(request)
+        const primaryType = request.includedPrimaryTypes?.[0] ?? 'restaurant'
+        return {
+          places: Array.from({ length: 20 }, (_, index) => ({
+            id: `${primaryType}-${index}`, primaryType, location: { toJSON: () => center },
+          }))
+        }
+      }
+    }
+  }
+  const japanese = await fetchNearby(library, center, 1000, false, 'japanese')
+  assert.equal(japanese.length, 20)
+  assert.ok(requests[0].includedPrimaryTypes.includes('ramen_restaurant'))
+  assert.equal(requests[0].includedTypes, undefined)
+  assert.equal(requests[0].maxResultCount, 20)
+  assert.deepEqual(requests[0].locationRestriction, { center, radius: 1000 })
+  await fetchNearby(library, center, 1000, false, 'japanese')
+  assert.equal(requests.length, 1)
+  await fetchNearby(library, center, 1000, false, 'cafe')
+  assert.ok(requests[1].includedPrimaryTypes.includes('cafe'))
+  await fetchNearby(library, center, 1000)
+  assert.equal(requests[2].includedPrimaryTypes, undefined)
+  assert.deepEqual(requests[2].includedTypes, ['restaurant'])
+  await assert.rejects(fetchNearby(library, center, 1000, false, 'invalid'), /無效料理類別/)
+})
+
+test('指定料理補查維持同類別、去重並停止於 20 間', async () => {
+  const { fetchNearby } = load('domain/places/nearby.ts')
+  const { CUISINE_GROUPS } = load('domain/places/cuisines.ts')
+  const types = CUISINE_GROUPS.find(group => group.value === 'japanese').types
+  const center = { lat: 12, lng: 121 }
+  const place = (id, primaryType = 'ramen_restaurant') => ({ id, primaryType, location: { toJSON: () => center } })
+  let calls = 0
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async request => {
+        calls++
+        assert.ok(request.includedPrimaryTypes.every(type => types.includes(type)))
+        return {
+          places: calls === 1
+            ? Array.from({ length: 20 }, (_, i) => place(String(i), i === 0 ? 'hotel' : 'ramen_restaurant'))
+            : [place('1'), place('wrong', 'korean_restaurant'), place('20'), place('21')]
+        }
+      }
+    }
+  }, center, 500, true, 'japanese')
+  assert.equal(calls, 2)
+  assert.equal(results.length, 20)
+  assert.equal(new Set(results.map(r => r.id)).size, 20)
+  assert.ok(results.every(r => r.cuisine === 'ramen_restaurant'))
+})
+
+test('其他類別排除已知料理，少於 20 間時回傳實際數量', async () => {
+  const { fetchNearby } = load('domain/places/nearby.ts')
+  const center = { lat: 11, lng: 121 }
+  const results = await fetchNearby({
+    Place: {
+      searchNearby: async request => {
+        assert.ok(request.excludedPrimaryTypes.includes('japanese_restaurant'))
+        assert.ok(request.excludedPrimaryTypes.length <= 50)
+        return { places: [{ id: 'other', primaryType: 'seafood_restaurant', location: { toJSON: () => center } }] }
+      }
+    }
+  }, center, 3000, true, 'other')
+  assert.equal(results.length, 1)
+})
+
 test('currentOpeningHours 依店家時區判斷多段營業、跨日、全天及缺值', () => {
   const { getOpenNow } = load('domain/places/openingHours.ts')
   const point = (day, hour, minute = 0) => ({ day, hour, minute })
-  const hours = { periods: [
-    { open: point(1, 9), close: point(1, 12) },
-    { open: point(1, 17), close: point(1, 22) },
-  ] }
+  const hours = {
+    periods: [
+      { open: point(1, 9), close: point(1, 12) },
+      { open: point(1, 17), close: point(1, 22) },
+    ]
+  }
   const at = iso => new Date(iso)
   assert.equal(getOpenNow(hours, 480, at('2026-11-16T01:00:00Z')), true)
   assert.equal(getOpenNow(hours, 480, at('2026-11-16T04:00:00Z')), false)
@@ -547,4 +686,37 @@ test('currentOpeningHours 依店家時區判斷多段營業、跨日、全天及
   assert.equal(getOpenNow(null, 480), null)
   assert.equal(getOpenNow(hours, null), null)
   assert.equal(getOpenNow({ periods: [{ open: point(1, 9) }] }, 480), null)
+})
+
+// 多條件查詢：同一中心也必須隔離不同條件的結果與快取。
+test('價格、評分、營業狀態分別查詢，快取不混用並保留組合條件', async () => {
+  const { fetchNearby } = load('domain/places/nearby.ts')
+  const center = { lat: 10, lng: 121 }
+  let calls = 0
+  const library = {
+    Place: {
+      searchNearby: async () => {
+        calls++
+        return {
+          places: [
+            { id: 'cheap', priceLevel: 'INEXPENSIVE', rating: 4.5 },
+            { id: 'moderate', priceLevel: 'MODERATE', rating: 3 },
+            { id: 'unknown', rating: 4 },
+          ].map(place => ({ ...place, primaryType: 'ramen_restaurant', location: { toJSON: () => center } }))
+        }
+      }
+    }
+  }
+  const search = criteria => fetchNearby(library, center, 1000, false, 'japanese', { price: '', rating: 0, opening: '', ...criteria })
+  assert.deepEqual((await search({ price: 'INEXPENSIVE' })).map(r => r.id), ['cheap'])
+  assert.deepEqual((await search({ rating: 4 })).map(r => r.id), ['cheap', 'unknown'])
+  assert.equal((await search({ opening: 'unknown' })).length, 3)
+  assert.deepEqual(await search({ opening: 'open' }), [])
+  assert.deepEqual(await search({ opening: 'closed' }), [])
+  assert.deepEqual((await search({ price: 'INEXPENSIVE', rating: 4, opening: 'unknown' })).map(r => r.id), ['cheap'])
+  assert.equal(calls, 6)
+  await search({ price: 'INEXPENSIVE' })
+  assert.equal(calls, 6)
+  await fetchNearby(library, center, 1000, true, 'japanese', { price: 'INEXPENSIVE', rating: 0, opening: '' })
+  assert.equal(calls, 7)
 })

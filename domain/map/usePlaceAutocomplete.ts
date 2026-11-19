@@ -1,12 +1,15 @@
 'use client'
 
+// 地點建議 Hook：延遲查詢、共用搜尋工作階段，並防止舊建議覆蓋新輸入。
 import { useEffect, useRef, useState } from 'react'
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
 
 // 只取得建議文字與地點識別；座標留到使用者提交搜尋時再查詢。
 export default function usePlaceAutocomplete(query: string, enabled: boolean) {
   const places = useMapsLibrary('places')
+  // 同一次輸入流程共用 token；提交或清空後開始新的工作階段。
   const token = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
+  // 除了 effect cleanup，重設 session 也必須讓尚未回覆的查詢失效。
   const generation = useRef(0)
   const [result, setResult] = useState<{
     query: string
@@ -59,6 +62,7 @@ export default function usePlaceAutocomplete(query: string, enabled: boolean) {
     }
   }, [query, enabled, places])
 
+  // 輸入剛變更、effect 尚未執行時，也不顯示上一個關鍵字的建議。
   const current = enabled && Boolean(query.trim()) && result.query === query
   return {
     options: current ? result.options : [],

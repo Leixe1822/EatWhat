@@ -16,6 +16,7 @@ export default function KeySettings() {
   // 密碼欄位的即時內容，不會每輸入一個字就保存金鑰。
   const [draft, setDraft] = useState('')
 
+  // store 接受金鑰後清空草稿；驗證失敗則保留輸入供使用者修改。
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (setKey(draft)) {

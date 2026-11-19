@@ -30,6 +30,7 @@ function Explorer() {
   const busy = status !== 'idle'
   const ready = apiStatus === APILoadingStatus.LOADED
   const autocomplete = usePlaceAutocomplete(query, ready && !busy && !selectedPlace)
+  // 已選建議可直接查地點；自由文字則要等 Places 程式庫就緒。
   const searchReady = Boolean(selectedPlace) || placesReady
   const failed =
     apiStatus === APILoadingStatus.FAILED || apiStatus === APILoadingStatus.AUTH_FAILURE

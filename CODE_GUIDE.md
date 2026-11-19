@@ -1,115 +1,143 @@
-# EatWhat 初學者程式閱讀指南
+# EatWhat 程式閱讀指南
 
-先跟著使用者的一次操作閱讀，不必一次看懂全部檔案。程式中的繁體中文註解會解釋每個檔案的用途，以及為什麼需要某些防護。
+先依一次使用流程閱讀，再查看各檔案內的繁體中文註釋。註釋主要解釋用途、資料單位、狀態變化與邊界條件；簡單語法不逐行重複說明。
 
-## 1. 看懂首頁
+## 頁面與共用環境
 
-1. `app/layout.tsx`：所有頁面共用的外層，提供字型、MUI 主題與 Google Maps 載入管理。
-2. `app/page.tsx`：首頁入口，只負責組裝元件。
-3. `components/LandingPage/LandingPage.tsx`：連接畫面、搜尋 Hook 與金鑰設定視窗。
-4. `components/LandingPage/HomeHero.tsx`：左右欄版面、標題、輸入框與按鈕。
-5. `styles/theme.ts`：全站顏色、字體、圓角與元件樣式。首頁右側綠色框由 `HomeHero.tsx` 負責，目前不使用插畫。
-
-`props` 是父元件傳給子元件的資料或函式。`children` 是元件標籤之間的內容。輸入框的 `value` 顯示 state，`onChange` 收到輸入事件後更新 state。按鈕的 `onClick` 和表單的 `onSubmit` 則呼叫對應函式。
-
-MUI 的 `sx` 用來描述外觀，`p` 是內距、`mx` 是左右外距、`bgcolor` 是背景色。`{ xs: 12, md: 6 }` 表示手機佔滿 12 欄、桌面佔 6 欄。這些是套件的標準寫法，因此保留並加上解釋。
-
-## 2. 輸入金鑰
-
-- `domain/key/store.ts`：Zustand 保存共用金鑰狀態，persist 只把 key 寫入 localStorage。
-- `components/KeySettings/KeySettings.tsx`：輸入草稿及提交事件。
-- `components/ApiKeyDialog/ApiKeyDialog.tsx`：Maps 尚未就緒時顯示遮罩。
-- `shells/ProviderShell/MapsGate.tsx`：掛載後還原金鑰，再載入 Google Maps，處理授權失敗及逾時。
-- `shells/ProviderShell/APIProvider.tsx`：將 props 傳給套件的 APIProvider。
-
-hydration 在這個 store 的意思是「從 localStorage 還原資料」。它不等於 Google 驗證成功，所以 ready 不會一起保存。更換金鑰必須重載頁面，避免同一頁重複載入不同的 Google Maps 金鑰。
-
-## 3. 搜尋地址與定位
-
-- `domain/map/useLocationSearch.ts`：首頁呼叫的 Hook，分別處理地址和目前位置，再共用更新中心點及跳頁步驟。
-- `domain/map/location.ts`：座標驗證、URL 解析、瀏覽器定位。
-- `domain/map/searchError.ts`：分類錯誤，遮蔽診斷訊息中的金鑰。
-- `domain/map/store.ts`：跨元件共享搜尋中心與 Google 地圖實例。
-- `domain/map/config.ts`：既有預設座標及縮放。
-
-成功後，座標同時存入 Zustand 和 URL：Zustand 供元件共享，URL 讓重新整理後仍能還原位置。API Key 不放入 URL。
-
-## 4. 第二頁餐廳搜尋
-
-1. `app/restaurants/page.tsx`：路由入口，用 Suspense 提供等待畫面。
-2. `components/RestaurantsPage/RestaurantsPage.tsx`：驗證網址座標，決定顯示提示或地圖。
-3. `domain/places/useNearbyRestaurants.ts`：中心點改變時搜尋，管理載入、錯誤與重試狀態。
-4. `domain/places/nearby.ts`：呼叫 Google、整理餐廳資料、共用重複請求及限制等待時間。
-5. `components/MapContainer/MapContainer.tsx`：產生標記、清單、範圍圓及資訊視窗。
-6. `components/MapContainer/config.ts`：Map ID 設定。真正隱藏底圖商家需搭配 Google Cloud 地圖樣式。
-
-注意：`domain/places/store.ts` 是保留的舊版 1 公里流程及隨機選餐廳功能，目前第二頁使用上述 3 公里流程。新版仍共用其中的 Restaurant 型別，沒有把舊功能刪掉。
-
-## 常見語法
-
-| 語法 | 意思 |
+| 檔案 | 責任 |
 | --- | --- |
-| `useState` | 記住元件資料，更新後重新顯示畫面 |
-| `useRef` | 記住資料，但修改它不會觸發重畫，例如防止重複提交的鎖 |
-| `useEffect` | 畫面提交後執行同步工作；回傳函式用來清理計時器或停用舊請求 |
-| `async / await` | 用由上而下的寫法等待非同步結果，不會把整個瀏覽器卡住 |
-| `try / catch / finally` | 執行工作、處理失敗、最後清理 |
-| `Promise.race` | 採用最先完成的結果；這裡用來比較 API 回覆和逾時 |
-| `Map` / `Set` | JavaScript 的鍵值表／不重複集合，不是 Google 地圖 |
-| `?.` | 物件不存在時不繼續存取，回傳 undefined |
-| `??` | 只有 null 或 undefined 才使用右邊的預設值 |
-| `...state` | 複製物件既有欄位，再覆寫需要更新的欄位 |
-| `type` | 說明資料應有哪些欄位，方便 TypeScript 提早檢查 |
-| `Partial<T>` | T 的所有欄位都可省略，適合只更新部分狀態 |
-| `Pick<T, 'key'>` | 只取 T 裡的 key 欄位型別 |
-| `unknown` | 尚未確認的外部資料，檢查型別後才能使用 |
-| `void search()` | 啟動非同步工作但不在當下等待；函式內仍須處理錯誤 |
+| `app/layout.tsx` | 全站版型、字型、MUI 樣式快取與主題，以及 Maps 載入入口。 |
+| `app/page.tsx` | 首頁路由，組裝 `LandingPage`。 |
+| `app/restaurants/page.tsx` | 結果頁路由，以 Suspense 包住需要讀取 URL 的互動元件。 |
+| `shells/ProviderShell/MapsGate.tsx` | 還原金鑰、載入 Google Maps，處理授權失敗與逾時。 |
+| `shells/ProviderShell/APIProvider.tsx` | 原樣傳遞 props 給套件 Provider，統一 Client Component 入口。 |
+| `shells/ProviderShell/index.ts` | 供外部從資料夾路徑匯入 Provider。 |
+| `styles/theme.ts` | 全站顏色、字體、元件外觀與 MUI 過場設定。 |
+| `components/Logo.tsx` | 共用品牌標誌與返回首頁連結。 |
 
-不要為了縮短程式移除 active、快取或計時器清理。Google 請求可能比下一次搜尋更晚回來，這些程式碼用來防止錯誤資料覆蓋目前畫面。
+`'use client'` 表示互動元件的客戶端邊界。`props` 是父元件傳入的資料或函式；`children` 是標籤之間的內容。畫面元件透過回呼通知父層，不自行保存另一份搜尋條件。
 
-## 設定與測試
+## 金鑰設定
 
-- `index.ts`：資料夾的統一匯出入口，讓 import 路徑更短。
-- `next.config.ts`：Next.js、靜態匯出及部署路徑設定。
-- `eslint.config.mjs`：程式碼檢查規則。
-- `tsconfig.json`：TypeScript 型別與路徑設定，原檔已有註解。
-- `package.json`：依賴套件與 npm 指令；標準 JSON 不支援註解，所以不在裡面插入註解。
-- `tests/state.test.mjs`：用假的 Google 資料與儲存空間驗證流程，不發送真實 API 請求。
+| 檔案 | 責任 |
+| --- | --- |
+| `domain/key/store.ts` | Zustand 共用狀態，使用 persist 保存金鑰。 |
+| `components/KeySettings/KeySettings.tsx` | 金鑰草稿、提交、重試與清除操作。 |
+| `components/KeySettings/index.ts` | 表單元件匯出入口。 |
+| `components/ApiKeyDialog/ApiKeyDialog.tsx` | Maps 未就緒時顯示不可關閉的設定遮罩。 |
 
-套件、鎖定檔、`.next/`、`out/`、`next-env.d.ts` 及圖片不是手動改寫的應用程式碼，不需逐行加註解。
+只保存 `key`，不保存 `ready`。每次重新整理都重新載入 Maps；還原金鑰不代表授權成功。`clearing` 防止清除後、重載前的晚到事件把舊金鑰寫回儲存空間。
 
-執行檢查：
+## 首頁與地點搜尋
+
+| 檔案 | 責任 |
+| --- | --- |
+| `components/LandingPage/LandingPage.tsx` | 連接搜尋 Hook、首頁畫面與設定視窗。 |
+| `components/LandingPage/HomeHero.tsx` | 首頁排版、搜尋卡片、地點建議及定位按鈕。 |
+| `components/LandingPage/FoodMapIllustration.tsx` | SVG 插畫與 MUI `styled`／`keyframes` 浮動動畫。 |
+| `components/LandingPage/FoodMapIllustration.module.css` | 插畫定位與尺寸；不處理動畫。 |
+| `components/LandingPage/index.ts` | 首頁互動元件匯出入口。 |
+| `domain/map/usePlaceAutocomplete.ts` | 等待輸入停止 300 毫秒後查詢建議，管理 session token 與過期回覆。 |
+| `domain/map/useLocationSearch.ts` | 地址、建議或裝置定位轉座標；首頁導航，結果頁呼叫 `onLocated`。 |
+| `domain/map/location.ts` | 座標型別、有效性驗證、URL 解析與瀏覽器定位。 |
+| `domain/map/searchError.ts` | 對使用者顯示固定錯誤文案，診斷訊息遮蔽金鑰及 URL。 |
+| `domain/map/store.ts` | 共用地圖實例與搜尋中心，不寫入 localStorage。 |
+| `domain/map/config.ts` | 保留舊版預設相機設定；目前結果頁另行計算視角。 |
+
+首頁選取建議時先暫存，提交才取得座標；手機結果頁選取建議則立即搜尋。`locked` 防止重複提交，`active` 與 `cancelled` 防止卸載或換條件後，舊請求覆蓋目前畫面。
+
+## 附近餐廳資料流程
+
+1. `RestaurantsPage` 從 URL 驗證中心點，保存距離、類別、價格、評分與營業狀態。
+2. `useNearbyRestaurants` 在中心或任一選單條件改變時重新查詢。
+3. `nearby.ts` 向 Google 取得資料，排除場所、去重並套用條件。
+4. 清單與地圖標記共用同一批結果；載入時顯示「搜尋中...」與 Skeleton。
+5. 點選餐廳只改變選取與地圖視角；拖曳搜尋中心才會更新位置及重新查詢。
+
+| 檔案 | 責任 |
+| --- | --- |
+| `components/RestaurantsPage/RestaurantsPage.tsx` | URL、篩選狀態、錯誤提示與重試入口。 |
+| `domain/places/useNearbyRestaurants.ts` | 載入狀態、請求識別、忽略過期回覆及重試。 |
+| `domain/places/nearby.ts` | Nearby 請求、快取、逾時、轉換與最多三批補查。 |
+| `domain/places/searchConfig.ts` | 共用預設搜尋半徑 3000 公尺，避免查詢與篩選互相依賴。 |
+| `domain/places/cuisines.ts` | 料理分組及 Google 類型對應；未涵蓋的類型歸入其他。 |
+| `domain/places/filters.ts` | 篩選型別、預設值、價格文字、球面直線距離與條件比對。 |
+| `domain/places/openingHours.ts` | 使用店家時區及結構化營業時段，判斷查詢當下是否營業。 |
+| `domain/places/store.ts` | 共用 `Restaurant` 型別；其餘搜尋與抽選函式保留舊版流程。 |
+
+目前頁面以 `refresh: true` 查詢，因此切回先前條件也會重送。資料服務本身仍提供快取，鍵包含中心、距離、類別、價格、評分與狀態。
+
+料理類別傳入 Google 的主要類型限制；價格、評分與營業狀態則在每批新資料取得後比對。首輪原始結果滿 20 筆、套用條件後不足時，才依既有策略補查。所有結果去重後最多保留 20 間，不保證補滿，也不代表範圍內所有餐廳。
+
+`openNow` 的 `true`、`false`、`null` 分別代表營業、休息、未知，不能用一般真假判斷把未知當成休息。營業狀態在查詢時運算，不會自動每分鐘更新。`keyword` 是保留的本地篩選欄位，目前沒有對應輸入框。
+
+## 結果清單與地圖互動
+
+| 檔案 | 責任 |
+| --- | --- |
+| `components/RestaurantsPage/ResultsPanel.tsx` | 篩選控制、隨機按鈕、Skeleton、餐廳清單與選取捲動。 |
+| `components/RestaurantsPage/MobileSearch.tsx` | 手機搜尋列、清除文字與目前位置按鈕。 |
+| `components/RestaurantsPage/MobileSheet.tsx` | 手機面板的 15%、50%、90% 高度、拖曳吸附及鍵盤操作。 |
+| `components/RestaurantsPage/LocationSearch.tsx` | 保留的搜尋表單元件，目前沒有掛載。 |
+| `components/MapContainer/MapContainer.tsx` | 搜尋圈、相機縮放、標記、資訊卡及桌面清單開關。 |
+| `components/MapContainer/useMobileViewport.ts` | 將手機可視高度與位移同步到 CSS 變數，處理鍵盤與網址列。 |
+| `components/MapContainer/config.ts` | Map ID 與是否有自訂 ID 的設定。 |
+| `components/MapContainer/index.ts` | 地圖元件及設定的匯出入口。 |
+
+桌面開關使用 `Switch`，左側顯示 `ListAltIcon`。手機使用底部面板；拖曳時停用高度過場，放開後吸附到最近高度。面板、地圖及定位按鈕的過場共用 MUI 主題時間，並尊重減少動態效果設定。
+
+隨機抽選保留所有篩選條件，只從本次結果抽選。搜尋期間保留按鈕外觀並以事件檢查暫停抽選；只有查詢完成且零筆時才呈現停用灰色。
+
+搜尋中心與相機中心不同。`panTo` 只移動畫面；搜尋圈仍維持原本中心及半徑。自動視角使用 0.5、1、2 公里半徑的 60%，以及 3 公里半徑的 75% 計算取景，讓畫面更近；圈邊緣因此可能超出可視區。選取餐廳時保留資訊卡視角，不用搜尋圈縮放覆蓋它。
+
+## 設定檔與套件
+
+`package.json` 是標準 JSON，不能插入註釋；以下說明其內容，檔案本身保持 npm 可讀。
+
+| 項目 | 用途 |
+| --- | --- |
+| `name`、`version`、`private` | 專案識別與版本；`private: true` 避免誤發佈到 npm。 |
+| `scripts.dev` | `next dev`，啟動開發伺服器。 |
+| `scripts.build` | `next build`，配合設定產生靜態輸出。 |
+| `scripts.start` | `next start`；本專案採靜態匯出，部署時應由靜態主機提供 `out/`。 |
+| `scripts.lint` | 執行 ESLint。 |
+| `next`、`react`、`react-dom` | 路由、建置與畫面渲染。 |
+| `@mui/material`、`@mui/icons-material` | 介面元件及圖示。 |
+| `@mui/material-nextjs` | Next.js 與 MUI 的樣式快取整合，不是動畫套件。 |
+| `@emotion/cache`、`@emotion/react`、`@emotion/styled` | MUI 的樣式產生與快取依賴。 |
+| `@vis.gl/react-google-maps` | React 地圖元件、Provider 與 Google 程式庫 Hooks。 |
+| `zustand` | 跨元件狀態與金鑰保存。 |
+| `typescript`、`@types/node`、`@types/react`、`@types/react-dom` | 型別檢查與型別宣告。 |
+| `eslint`、`eslint-config-next` | 靜態程式碼檢查。 |
+| `babel-plugin-react-compiler` | 配合 Next.js 設定進行 React 編譯最佳化。 |
+
+- `next.config.ts`：靜態匯出、部署前綴、React Compiler 與圖片設定。
+- `eslint.config.mjs`：合併 Next.js、TypeScript 規則，排除生成檔。
+- `tsconfig.json`：此設定格式允許註釋，原檔說明嚴格型別、模組解析及 `@/` 路徑。
+- 各資料夾的 `index.ts`：統一匯出入口，不另建一份功能。
+- `package-lock.json`、`next-env.d.ts`、`node_modules/`、`.next/`、`out/`：套件或工具管理，不手動加註釋。
+- 圖片及圖示二進位檔沒有程式註釋；SVG 路徑以圖形區塊的用途說明，不逐個座標翻譯。
+
+## 常見語法與檢查
+
+| 語法 | 用途 |
+| --- | --- |
+| `useState` | 保存會影響畫面的狀態，更新後重新渲染。 |
+| `useRef` | 保存 DOM 或同步旗標，修改值不觸發渲染。 |
+| `useEffect` | 同步瀏覽器、地圖或非同步工作；回傳函式清理事件與計時器。 |
+| `Promise.race` | 採用先完成的結果，不會自動取消另一個 API 請求。 |
+| `?.` / `??` | 安全讀取可缺省值；只在 null 或 undefined 時使用預設。 |
+| `Map` / `Set` | 鍵值快取與去重集合，與地圖元件 `Map` 不同。 |
+| `sx` | MUI 樣式物件；`px` 是水平內距、`gap` 是間距。 |
+| `minHeight: 0` | 允許 flex 子層縮小，使長清單在自己的區域內捲動。 |
+| `aria-*` | 提供載入、控制項名稱與操作狀態給輔助工具。 |
+
+`tests/state.test.mjs` 用假的 Google、定位與儲存空間測試資料邏輯，不使用真實配額。測試內的 TypeScript 載入器讓 Node 可以執行專案模組。
 
 ```sh
 npx tsc --noEmit
 npm run lint
 node --test tests/state.test.mjs
-npx next build --webpack
 ```
 
-
-## 本次整合的版面與套件變更
-
-- `components/Logo.tsx`：兩頁共用的餐具圖示與 EatWhat. 品牌文字，點擊返回首頁。
-- `components/RestaurantsPage/ResultsPanel.tsx`：左側搜尋結果面板，Menu 按鈕控制開闔，清單與地圖共用選取狀態。
-- `components/MapContainer/MapContainer.tsx`：桌面左右兩欄，手機可收合清單；中心點與餐廳使用不同大小、顏色的 LocationOn 圖示。
-- `components/LandingPage/HomeHero.tsx`：左右並排的探索／定位按鈕，定位使用 MyLocation 圖示；右側保留空白綠色面板。
-- `app/layout.tsx`、`styles/theme.ts`：Outfit 用於英文品牌與小標，Noto Sans TC 用於主要文字；字型變數由根版型提供。
-- `domain/map/config.ts`：共用預設縮放為 12；搜尋半徑則由 `domain/places/nearby.ts` 的 3000 公尺設定控制。
-- `package.json`：新增與既有 MUI 相容的 `@mui/icons-material` 9.4.0，提供 Flatware、MyLocation、Menu、LocationOn 及返回圖示。
-- `package-lock.json`：由 npm 自動記錄上述套件的精確版本與完整性資訊，請勿手動插入註解。
-
-標準 JSON 不支援 `//` 或 `/* */` 註解，因此套件檔案的中文說明放在本段，確保 npm 仍可正常讀取。
-
-
-## 目前結果頁的資料流程與註解約定
-
-- `RestaurantsPage.tsx` 保存篩選條件。距離改變會呼叫 `useNearbyRestaurants` 重新查詢；料理、價格、評分及營業狀態在本地篩選。
-- `nearby.ts` 查詢、排除婚宴與住宿場所、整理資料。首輪取得 20 筆但排除後不足時，最多補查三批，不保證補滿。
-- `openingHours.ts` 在查詢當下，用近期營業時段及店家時區計算狀態。`true` 是營業、`false` 是休息、`null` 是未知；不會每分鐘自動重算。
-- `filters.ts` 定義料理分組及本地比對；`keyword` 是保留欄位，目前沒有搜尋輸入框。
-- `MapContainer.tsx` 用同一份篩選結果顯示清單及標記。隨機抽選保留半徑、重設其他條件；新資料批次會清除舊選取的顯示。
-- `ResultsPanel.tsx` 上方控制區固定，下方清單可捲動；選中項目用 `scrollIntoView` 移入可視範圍。
-- `LocationSearch.tsx` 是保留元件，目前未掛載。`domain/places/store.ts` 的搜尋函式是舊流程，仍供測試及舊呼叫端使用。
-
-註解以「用途、原因、資料單位、邊界條件」為主，不逐行翻譯語法。複雜條件優先拆成有意義的變數，避免靠大量註解解釋巢狀判斷。JSON 設定、鎖定檔及自動產生的檔案不添加程式註解。
+新增註釋或整理版面時，保留既有操作、選項與 API 欄位。避免把商品文案改成實作說明；複雜程式先分行、釐清責任，再補上必要的原因。

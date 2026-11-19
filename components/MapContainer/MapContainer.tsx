@@ -1,31 +1,49 @@
 'use client'
 
 // 餐廳地圖：共用一份餐廳資料來產生標記、清單與資訊視窗。
-import { useEffect, useRef, useState } from 'react'
-import { Box, Button, Chip, IconButton, Stack, Typography, useTheme, useMediaQuery } from '@mui/material'
+import { useEffect, useState } from 'react'
+import {
+  Box,
+  Button,
+  Chip,
+  FormControlLabel,
+  IconButton,
+  Switch,
+  Stack,
+  Typography,
+  useTheme,
+  useMediaQuery
+} from '@mui/material'
 import { AdvancedMarker, InfoWindow, Map, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
 import CloseIcon from '@mui/icons-material/Close'
+import ListAltIcon from '@mui/icons-material/ListAlt'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
-import MenuIcon from '@mui/icons-material/Menu'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import { DEFAULT_FILTERS, filterRestaurants, type RestaurantFilters } from '@/domain/places/filters'
+import { filterRestaurants, type RestaurantFilters } from '@/domain/places/filters'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
-import MobileSheet from '@/components/RestaurantsPage/MobileSheet'
+import MobileSheet, {
+  COLLAPSED_HEIGHT,
+  HALF_OPEN_HEIGHT,
+} from '@/components/RestaurantsPage/MobileSheet'
 import MobileSearch from '@/components/RestaurantsPage/MobileSearch'
 import ResultsPanel from '@/components/RestaurantsPage/ResultsPanel'
 import useMapStore, { setMap } from '@/domain/map/store'
 import { isValidCenter, type Center } from '@/domain/map/location'
 import type { Restaurant } from '@/domain/places/store'
 import { MAP_ID } from './config'
+import useMobileViewport from './useMobileViewport'
 
 // Google Circle 不是 React 元件；effect 建立它，cleanup 負責從地圖移除。
-function SearchRange({ center, radius }: { center: Center; radius: number }) {
+function SearchRange({ center, radius, isMobile, focusSearch }: {
+  center: Center
+  radius: number
+  isMobile: boolean
+  focusSearch: boolean
+}) {
   const map = useMap()
-  // 記住哪張地圖已縮放過；拖曳中心點時不再自動重設 Zoom。
-  const fittedMap = useRef<google.maps.Map | null>(null)
   const maps = useMapsLibrary('maps')
   const theme = useTheme()
   const { lat, lng } = center
+  // 將套件內部的地圖實例提供給外層互動事件，卸載時清掉參考。
   useEffect(() => {
     setMap(map)
     return () => {
@@ -47,18 +65,47 @@ function SearchRange({ center, radius }: { center: Center; radius: number }) {
       strokeWeight: 2,
       clickable: false,
     })
-    // 首次掛載才縮放至範圍圈；後續改篩選保留使用者目前的視角。
-    const bounds = circle.getBounds()
-    if (bounds && fittedMap.current !== map) {
-      map.fitBounds(bounds, 32)
-      fittedMap.current = map
-    }
     return () => circle.setMap(null)
   }, [map, maps, lat, lng, radius, theme.palette.primary.main, theme.palette.secondary.main])
+
+  useEffect(() => {
+    if (!map || !maps || !focusSearch) return
+
+    // 0.5、1、2 公里再拉近視角，3 公里維持原設定；不改變實際搜尋範圍。
+    const cameraRadius = radius * (radius <= 2000 ? 0.6 : 0.75)
+    const bounds = new maps.Circle({ center: { lat, lng }, radius: cameraRadius }).getBounds()
+    if (!bounds) return
+    const mapElement = map.getDiv()
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined
+
+    const fitSearchRange = () => {
+      if (!mapElement.clientWidth || !mapElement.clientHeight) return
+      const topPadding = isMobile
+        ? Math.min(112, mapElement.clientHeight / 3)
+        : 32
+      map.fitBounds(bounds, { top: topPadding, bottom: 32, left: 32, right: 32 })
+    }
+
+    fitSearchRange()
+    // 等面板過場或鍵盤尺寸穩定後再縮放，避免每個動畫影格都移動鏡頭。
+    // 只監聽容器尺寸；使用者手動平移或縮放不會觸發這個 observer。
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(fitSearchRange, 150)
+    })
+    observer.observe(mapElement)
+
+    return () => {
+      observer.disconnect()
+      clearTimeout(resizeTimer)
+    }
+  }, [map, maps, lat, lng, radius, isMobile, focusSearch])
   return null
 }
 
+// 頁面負責查詢條件與中心；容器只管理視角、餐廳選取和面板開關。
 type MapContainerProps = {
+  isLoading: boolean
   filters: RestaurantFilters
   onFiltersChange: (filters: RestaurantFilters) => void
   center: Center
@@ -70,7 +117,14 @@ type RestaurantSelection = {
   results: Restaurant[] // 記住選取時的資料批次；新搜尋不沿用舊選取。
 }
 
-export default function MapContainer({ center, restaurants, onCenterChange, filters, onFiltersChange }: MapContainerProps) {
+export default function MapContainer({
+  isLoading,
+  center,
+  restaurants,
+  onCenterChange,
+  filters,
+  onFiltersChange,
+}: MapContainerProps) {
   // 篩選狀態由查詢層管理；同一份篩選結果同時驅動清單、筆數與標記。
   const filteredRestaurants = filterRestaurants(restaurants, center, filters)
   const [selection, setSelection] = useState<RestaurantSelection | null>(null)
@@ -79,22 +133,13 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
   const map = useMapStore(state => state.map)
   const isMobile = useMediaQuery('(max-width: 767.98px)')
   const isDesktop = !isMobile
-  const [sheetHeight, setSheetHeight] = useState(50)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // visualViewport 同時處理軟鍵盤與網址列；面板高度只影響排版。
-  useEffect(() => {
-    if (!isMobile) return
-    const viewport = window.visualViewport
-    const update = () => {
-      containerRef.current?.style.setProperty('--mobile-height', viewport ? viewport.height + 'px' : '100dvh')
-      containerRef.current?.style.setProperty('--mobile-top', viewport ? viewport.offsetTop + 'px' : '0px')
-    }
-    update()
-    viewport?.addEventListener('resize', update)
-    viewport?.addEventListener('scroll', update)
-    return () => { viewport?.removeEventListener('resize', update); viewport?.removeEventListener('scroll', update) }
-  }, [isMobile])
+  const [sheetHeight, setSheetHeight] = useState(HALF_OPEN_HEIGHT)
+  // 拖曳期間將共用過場時間設為零，避免面板落後手指移動。
+  const [isSheetDragging, setIsSheetDragging] = useState(false)
+  const containerRef = useMobileViewport(isMobile)
+  const isSheetListVisible = sheetHeight > COLLAPSED_HEIGHT
+  // 手機面板超過半屏時隱藏資訊卡，但不清除已選餐廳。
+  const canShowInfoWindow = !isMobile || sheetHeight <= HALF_OPEN_HEIGHT
   // 尚未手動切換時依螢幕大小決定；切換後保留使用者的選擇。
   const panelOpen = listOpen ?? isDesktop
 
@@ -110,10 +155,11 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
     setSelection({ id: restaurant.id, results: restaurants })
     map?.panTo(restaurant.location)
     if (!isDesktop) {
-      setSheetHeight(fromMarker ? 50 : 15)
+      setSheetHeight(fromMarker ? HALF_OPEN_HEIGHT : COLLAPSED_HEIGHT)
     }
   }
 
+  // 選中餐廳時保留資訊卡視角，不交由搜尋圈的自動縮放覆蓋。
   useEffect(() => {
     if (!isMobile || !map || !selectedRestaurant) return
     const frame = requestAnimationFrame(() => {
@@ -123,24 +169,19 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
     return () => cancelAnimationFrame(frame)
   }, [isMobile, map, selectedRestaurant, sheetHeight])
 
+  // 手機地址搜尋或定位成功後，更新搜尋中心並收合面板。
   function locateCenter(next: Center) {
     onCenterChange(next)
     map?.panTo(next)
-    setSheetHeight(15)
+    setSheetHeight(COLLAPSED_HEIGHT)
   }
 
   // 從本次完整結果等機率抽一間，不額外呼叫 API。
-  // 保留查詢半徑、清除其他篩選，讓抽中的餐廳可見，且不觸發新搜尋。
+  // 保留全部搜尋條件，從本次符合條件的結果抽選，不觸發新搜尋。
   function selectRandomRestaurant() {
-    if (restaurants.length === 0) return
+    if (isLoading || restaurants.length === 0) return
     const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)]
-    onFiltersChange({ ...DEFAULT_FILTERS, distance: filters.distance })
     selectRestaurant(restaurant)
-  }
-
-  // 第一次切換從目前螢幕預設狀態反轉，之後沿用使用者的手動選擇。
-  function toggleRestaurantList() {
-    setListOpen(previousOpen => !(previousOpen ?? isDesktop))
   }
 
   // 拖曳中心標記才觸發新搜尋；先驗證 Google 事件中的座標。
@@ -153,10 +194,34 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
     onCenterChange(newCenter)
   }
 
+  // 手機與桌面共用結果內容，只有手機需要底部面板包覆。
+  const resultsPanel = (
+    <ResultsPanel
+      isLoading={isLoading}
+      mobile={isMobile}
+      listVisible={!isMobile || isSheetListVisible}
+      restaurants={filteredRestaurants}
+      allRestaurants={restaurants}
+      filters={filters}
+      onFiltersChange={onFiltersChange}
+      selectedId={selectedRestaurant?.id}
+      open={isMobile || panelOpen}
+      onSelect={restaurant => selectRestaurant(restaurant)}
+      onRandomSelect={selectRandomRestaurant}
+    />
+  )
+
   return (
     <Box
       ref={containerRef}
       sx={{
+        // 面板、地圖與定位按鈕同步過場；拖曳時立即跟隨手指。
+        '--mobile-motion-duration': theme => isSheetDragging
+          ? '0ms'
+          : `${theme.transitions.duration.short}ms`,
+        '@media (prefers-reduced-motion: reduce)': {
+          '--mobile-motion-duration': '0ms',
+        },
         position: isMobile ? 'fixed' : 'relative',
         inset: isMobile ? 'var(--mobile-top, 0px) 0 auto' : undefined,
         height: isMobile ? 'var(--mobile-height, 100dvh)' : undefined,
@@ -176,29 +241,17 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
     >
       {isMobile && <MobileSearch onLocated={locateCenter} />}
       {isMobile ? (
-        <MobileSheet height={sheetHeight} onHeightChange={setSheetHeight} count={filteredRestaurants.length}>
-      <ResultsPanel mobile listVisible={sheetHeight > 15}
-        restaurants={filteredRestaurants}
-        allRestaurants={restaurants}
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        selectedId={selectedRestaurant?.id}
-        open={isMobile || panelOpen}
-        onSelect={restaurant => selectRestaurant(restaurant)}
-        onRandomSelect={selectRandomRestaurant}
-      />
+        <MobileSheet
+          isLoading={isLoading}
+          height={sheetHeight}
+          onHeightChange={setSheetHeight}
+          onDraggingChange={setIsSheetDragging}
+          count={filteredRestaurants.length}
+        >
+          {resultsPanel}
         </MobileSheet>
       ) : (
-      <ResultsPanel
-        restaurants={filteredRestaurants}
-        allRestaurants={restaurants}
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        selectedId={selectedRestaurant?.id}
-        open={isMobile || panelOpen}
-        onSelect={restaurant => selectRestaurant(restaurant)}
-        onRandomSelect={selectRandomRestaurant}
-      />
+        resultsPanel
       )}
       <Box
         sx={{
@@ -210,6 +263,12 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
           '& .gm-style-iw-tc': { display: 'none' },
           minWidth: 0,
           height: isMobile ? 'calc(100% - var(--sheet-size))' : 'var(--panel-height)',
+          transition: theme => isMobile
+            ? theme.transitions.create('height', {
+              duration: 'var(--mobile-motion-duration)',
+              easing: theme.transitions.easing.easeInOut,
+            })
+            : 'none',
           minHeight: 0,
           border: isMobile ? 0 : '2px solid',
           borderColor: 'divider',
@@ -217,19 +276,32 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
           overflow: 'hidden',
         }}
       >
-        {/* 展開時貼左側中央；收合時移到左上角，並保留鍵盤可操作的按鈕。 */}
-        <IconButton
-          onClick={toggleRestaurantList}
-          aria-label={panelOpen ? '收合搜尋結果' : '展開搜尋結果'}
-          aria-expanded={panelOpen}
-          aria-controls="restaurant-results"
-          sx={{ display: isMobile ? 'none' : undefined, position: 'absolute', zIndex: 1, left: panelOpen ? 0 : 12,
-            top: panelOpen ? '50%' : 12, transform: panelOpen ? 'translateY(-50%)' : 'none',
-            bgcolor: 'background.paper', boxShadow: 3,
-            '&:hover': { bgcolor: 'primary.light' } }}
-        >
-          {panelOpen ? <ChevronLeftIcon /> : <MenuIcon />}
-        </IconButton>
+        {/* 固定在地圖左上角，收合清單後仍可操作開關。 */}
+        <FormControlLabel
+          label={<ListAltIcon sx={{ display: 'block' }} />}
+          labelPlacement="start"
+          disableTypography
+          control={
+            <Switch
+              checked={panelOpen}
+              onChange={(_event, checked) => setListOpen(checked)}
+              slotProps={{ input: { 'aria-label': '顯示搜尋結果', 'aria-controls': 'restaurant-results' } }}
+            />
+          }
+          sx={{
+            display: isMobile ? 'none' : 'flex',
+            position: 'absolute',
+            zIndex: 1,
+            left: 12,
+            top: 12,
+            m: 0,
+            pl: 1.5,
+            minHeight: 44,
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            boxShadow: 3,
+          }}
+        />
         <Map
           mapId={MAP_ID}
           defaultCenter={center}
@@ -276,7 +348,12 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
             </Stack>
           </AdvancedMarker>
           {/* 範圍圈跟隨距離選單；半徑同時用於附近搜尋。 */}
-          <SearchRange center={center} radius={filters.distance} />
+          <SearchRange
+            center={center}
+            radius={filters.distance}
+            isMobile={isMobile}
+            focusSearch={!selectedRestaurant}
+          />
           {/* map 把每間餐廳轉成一個標記；key 讓 React 辨認各個項目。 */}
           {filteredRestaurants.map(restaurant => (
             <AdvancedMarker
@@ -301,7 +378,7 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
             </AdvancedMarker>
           ))}
           {/* 只有選中餐廳時才建立 InfoWindow；關閉只清空 selection。 */}
-          {selectedRestaurant && (!isMobile || sheetHeight <= 50) && (
+          {selectedRestaurant && canShowInfoWindow && (
             <InfoWindow
               key={selectedRestaurant.id}
               position={selectedRestaurant.location}
@@ -333,10 +410,19 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
                 }}
               >
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                  <Typography component="h2" variant="h6" sx={{ flex: 1, minWidth: 0, fontWeight: 800, lineHeight: 1.4 }}>
+                  <Typography
+                    component="h2"
+                    variant="h6"
+                    sx={{ flex: 1, minWidth: 0, fontWeight: 800, lineHeight: 1.4 }}
+                  >
                     {selectedRestaurant.name}
                   </Typography>
-                  <IconButton size="small" aria-label="關閉餐廳資訊" onClick={() => setSelection(null)} sx={{ color: 'text.primary', minWidth: 44, minHeight: 44 }}>
+                  <IconButton
+                    size="small"
+                    aria-label="關閉餐廳資訊"
+                    onClick={() => setSelection(null)}
+                    sx={{ color: 'text.primary', minWidth: 44, minHeight: 44 }}
+                  >
                     <CloseIcon fontSize="small" />
                   </IconButton>
                 </Stack>
@@ -370,7 +456,11 @@ export default function MapContainer({ center, restaurants, onCenterChange, filt
                     }}
                   />
                 </Stack>
-                <Stack direction="row" spacing={1} sx={{ pt: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'flex-start' }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ pt: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'flex-start' }}
+                >
                   <LocationOnIcon sx={{ fontSize: 20, mt: 0.4, color: 'text.secondary' }} />
                   <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
                     {selectedRestaurant.address}

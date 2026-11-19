@@ -1,5 +1,6 @@
 'use client'
 
+// 地點搜尋 Hook：把地址、建議選項或裝置定位轉成座標，再交給頁面導航或回呼。
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
@@ -18,6 +19,7 @@ export default function useLocationSearch(onLocated?: (center: Center) => void) 
   const [status, setStatus] = useState<'idle' | 'searching' | 'locating'>('idle')
   const [error, setError] = useState<string | null>(null)
   // useRef 立即記住數值但不觸發重畫；可在按鈕還沒變 disabled 前阻擋連點。
+  // 這是同步鎖，不是畫面 state；連續事件會立即看見鎖定值。
   const locked = useRef(false)
   // 離開首頁後不再更新 state，也不讓晚到的結果觸發跳頁。
   const active = useRef(true)
@@ -99,6 +101,7 @@ export default function useLocationSearch(onLocated?: (center: Center) => void) 
       if (!isValidCenter(center)) {
         throw new Error('取得的位置不合法，請重新選擇地點。')
       }
+      // 結果頁提供回呼以原地換位置；首頁未提供時才走後面的路由跳轉。
       if (onLocated) {
         onLocated(center)
         locked.current = false

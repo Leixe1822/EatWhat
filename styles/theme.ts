@@ -39,6 +39,7 @@ const theme = createTheme({
       defaultProps: { elevation: 0 },
       styleOverrides: { root: { backgroundImage: 'none' } },
     },
+    // 按鈕的位移與硬陰影共用 MUI 過場時間，減少動態效果時停止位移。
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
@@ -47,7 +48,7 @@ const theme = createTheme({
           padding: '10px 22px',
           borderRadius: 999,
           transition: theme.transitions.create(['transform', 'box-shadow', 'background-color'], {
-            duration: 150,
+            duration: theme.transitions.duration.shortest,
           }),
           '@media (hover: hover)': {
             '&:hover:not(.Mui-disabled)': { transform: 'translateY(-2px)' },
@@ -112,6 +113,7 @@ const theme = createTheme({
         }),
       },
     },
+    // 卡片及對話框延續相同邊框語言，陰影大小依元件用途區分。
     MuiCard: {
       styleOverrides: {
         root: ({ theme }) => ({
@@ -132,6 +134,7 @@ const theme = createTheme({
         }),
       },
     },
+    // 保留底線與鍵盤焦點輪廓，讓文字連結容易辨識與操作。
     MuiLink: {
       defaultProps: { underline: 'always' },
       styleOverrides: {

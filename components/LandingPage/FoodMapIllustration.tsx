@@ -1,9 +1,26 @@
+'use client'
+
+// 首頁裝飾插畫：SVG 描繪道路與餐點，MUI 樣式系統負責圖釘浮動。
 import type { ReactNode } from 'react'
+import { keyframes, styled } from '@mui/material/styles'
 import styles from './FoodMapIllustration.module.css'
 
 const ink = '#242824'
 const cream = '#FFF6DF'
 const orange = '#F6A04D'
+
+const float = keyframes`
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+`
+
+// 循環裝飾動畫使用 MUI 樣式系統；位置與縮放仍由外層 SVG 群組管理。
+const FloatingPin = styled('g')({
+  animation: `${float} 6s ease-in-out infinite`,
+  '@media (prefers-reduced-motion: reduce)': {
+    animation: 'none',
+  },
+})
 
 // 每個圖釘共用外框與圓形底；外層決定位置，內層只負責上下浮動。
 function FoodPin({ x, y, scale = 1, delay, children }: {
@@ -16,12 +33,16 @@ function FoodPin({ x, y, scale = 1, delay, children }: {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
       <ellipse cx="8" cy="94" rx="33" ry="10" fill={ink} opacity="0.18" />
-      <g className={styles.pin} style={{ animationDelay: delay }}>
-        <path d="M7 98 C-10 78 -57 29 -57 0 A64 64 0 1 1 71 0 C71 29 24 78 7 98Z" fill={ink} stroke="none" />
+      <FloatingPin sx={{ animationDelay: delay }}>
+        <path
+          d="M7 98 C-10 78 -57 29 -57 0 A64 64 0 1 1 71 0 C71 29 24 78 7 98Z"
+          fill={ink}
+          stroke="none"
+        />
         <path d="M0 90 C-17 70 -64 21 -64 -8 A64 64 0 1 1 64 -8 C64 21 17 70 0 90Z" fill={orange} />
         <circle cy="-10" r="49" fill={cream} />
         {children}
-      </g>
+      </FloatingPin>
     </g>
   )
 }
@@ -29,9 +50,17 @@ function FoodPin({ x, y, scale = 1, delay, children }: {
 // 純裝飾 SVG：道路延伸至邊界，圖示與圖釘使用同一座標系統等比例縮放。
 export default function FoodMapIllustration() {
   return (
-    <svg className={styles.illustration} viewBox="0 0 540 600" fill="none"
-      stroke={ink} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true" focusable="false">
+    <svg
+      className={styles.illustration}
+      viewBox="0 0 540 600"
+      fill="none"
+      stroke={ink}
+      strokeWidth="4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path fill="#D3F36A" stroke="none" d="M0 0H540V600H0Z" />
       {/* 先畫粗黑道路，再覆蓋米白線條，交叉路口不會出現多餘的分隔線。 */}
       {[46, 38].map((width) => (
@@ -44,16 +73,25 @@ export default function FoodMapIllustration() {
         </g>
       ))}
       {/* 米白襯底讓探索虛線在道路及綠地上都保持清楚。 */}
-      <path d="M118 181 C59 265 124 282 209 264 M231 355 C116 380 134 440 228 433 S270 514 396 497"
-        stroke={cream} strokeWidth="15" />
-      <path d="M118 181 C59 265 124 282 209 264 M231 355 C116 380 134 440 228 433 S270 514 396 497"
-        strokeWidth="5" strokeDasharray="10 13" />
+      <path
+        d="M118 181 C59 265 124 282 209 264 M231 355 C116 380 134 440 228 433 S270 514 396 497"
+        stroke={cream}
+        strokeWidth="15"
+      />
+      <path
+        d="M118 181 C59 265 124 282 209 264 M231 355 C116 380 134 440 228 433 S270 514 396 497"
+        strokeWidth="5"
+        strokeDasharray="10 13"
+      />
 
       <FoodPin x={116} y={116} scale={0.75} delay="-1.3s">
         {/* 拉麵：碗、麵條、筷子與蒸氣。 */}
         <path d="M-34 -8 Q-30 25 0 25 Q30 25 34 -8Z" fill={orange} />
         <ellipse cy="-8" rx="34" ry="10" fill={cream} />
-        <path d="M-20 -9 Q-8 -22 2 -8 M-7 -9 Q5 -24 16 -8 M9 -12 Q23 -23 15 -35 M18 -12 Q32 -25 24 -37" strokeWidth="3" />
+        <path
+          d="M-20 -9 Q-8 -22 2 -8 M-7 -9 Q5 -24 16 -8 M9 -12 Q23 -23 15 -35 M18 -12 Q32 -25 24 -37"
+          strokeWidth="3"
+        />
         <path d="M13 -33 39 -44 M16 -27 42 -38" strokeWidth="4" />
         <path d="M-22 -25 Q-30 -30 -23 -36 M-10 -29 Q-17 -36 -10 -42" strokeWidth="3" />
         <path d="M-15 26H15" />

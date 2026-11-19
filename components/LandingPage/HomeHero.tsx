@@ -31,13 +31,16 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
       sx={{ alignItems: 'center', justifyContent: 'center', width: '100%', py: { xs: 3, md: 3 } }}
     >
       <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
-        <Stack spacing={{ xs: 2.5, md: 3 }} sx={{
-          '@media (max-width: 767.98px)': {
-            maxWidth: 520, mx: 'auto',
-            '& > h1, & > p': { textAlign: 'center' },
-            '& > .MuiChip-root': { alignSelf: 'center' },
-          },
-        }}>
+        <Stack
+          spacing={{ xs: 2.5, md: 3 }}
+          sx={{
+            '@media (max-width: 767.98px)': {
+              maxWidth: 520, mx: 'auto',
+              '& > h1, & > p': { textAlign: 'center' },
+              '& > .MuiChip-root': { alignSelf: 'center' },
+            },
+          }}
+        >
           <Chip
             label="✳ FIND YOUR NEXT BITE"
             sx={{
@@ -73,7 +76,10 @@ export default function HomeHero({ children, feedback }: HomeHeroProps) {
           )}
         </Stack>
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, '@media (max-width: 767.98px)': { display: 'none' } }}>
+      <Grid
+        size={{ xs: 12, md: 6 }}
+        sx={{ minWidth: 0, '@media (max-width: 767.98px)': { display: 'none' } }}
+      >
         <Box
           sx={{
             bgcolor: 'primary.main',
@@ -112,6 +118,7 @@ type SearchCardProps = {
   onSelectPlace?: (place: google.maps.places.PlacePrediction) => void
   onLocate?: () => void
 }
+// 預設 props 讓 Maps 未載入時仍可顯示相同版型，但保持操作停用。
 export function SearchCard({
   query = '',
   busy = false,

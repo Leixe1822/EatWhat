@@ -1,5 +1,6 @@
 'use client'
 
+// 可重用的地點搜尋表單：先選建議、提交時查座標；目前頁面尚未掛載。
 import { useState, type SubmitEvent } from 'react'
 import { Alert, Autocomplete, Box, Stack, TextField } from '@mui/material'
 import useLocationSearch from '@/domain/map/useLocationSearch'

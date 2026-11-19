@@ -1,3 +1,4 @@
+// Next.js 建置設定：管理靜態匯出、部署路徑與編譯功能。
 import type { NextConfig } from 'next'
 
 // 正式建置才套用部署路徑，開發環境維持根路徑。

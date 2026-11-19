@@ -1,5 +1,6 @@
 // 使用 Google currentOpeningHours 的結構化時段，不解析翻譯後的營業文字。
 // 此函式在查詢時執行；不會自行計時更新，也不會另外發出 API 請求。
+// Google 時段以星期日為 0；結束點可缺省，交由下面的全天營業規則判斷。
 type Point = { day: number; hour: number; minute: number }
 type Hours = { periods: { open: Point; close?: Point | null }[] }
 const MINUTES_PER_WEEK = 7 * 24 * 60

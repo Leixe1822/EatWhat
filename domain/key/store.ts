@@ -1,3 +1,4 @@
+// 金鑰狀態與瀏覽器保存層：控制還原、載入、授權失敗及重新載入。
 import { create } from 'zustand'
 import { persist, type PersistStorage } from 'zustand/middleware'
 
@@ -12,6 +13,7 @@ export type KeyStore = {
 }
 
 // 延後至瀏覽器掛載才讀取；只保存 key，不保存上次的授權結果。
+// 清除後到整頁重載前，阻止晚到的事件把舊金鑰重新寫回儲存空間。
 let clearing = false
 const storage: PersistStorage<Pick<KeyStore, 'key'>> = {
   getItem: name => {
@@ -60,6 +62,7 @@ const useKeyStore = create<KeyStore>()(
       skipHydration: true,
       // 只保存金鑰，每次重新整理都必須重新確認 Maps 能否載入。
       partialize: state => ({ key: state.key }),
+      // 只信任已保存的非空字串；載入結果必須在本次頁面重新確認。
       merge: (saved, current) => {
         const value = (saved as { key?: unknown } | null)?.key
         let key: string | null = null
