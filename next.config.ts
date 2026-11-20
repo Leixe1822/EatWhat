@@ -4,7 +4,7 @@ import type { NextConfig } from 'next'
 // 正式建置才套用部署路徑，開發環境維持根路徑。
 const isProd = process.env.NODE_ENV === 'production'
 // TODO：依 GitHub Pages 的部署位置填入 repository 名稱。
-const PROJECT_NAME = ''
+const PROJECT_NAME = 'EatWhat'
 // 尚未指定 repository 時部署於根路徑，避免產生不合法的 basePath「/」。
 const deploymentPath = isProd && PROJECT_NAME ? `/${PROJECT_NAME}` : ''
 
