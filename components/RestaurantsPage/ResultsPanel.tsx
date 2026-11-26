@@ -18,6 +18,8 @@ import {
   Typography,
 } from '@mui/material'
 import ShuffleIcon from '@mui/icons-material/Shuffle'
+import CasinoIcon from '@mui/icons-material/Casino'
+import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import type { Restaurant } from '@/domain/places/store'
 
 type ResultsPanelProps = {
@@ -144,6 +146,21 @@ export default function ResultsPanel({
   // 載入中的空陣列不是空結果；保留按鈕外觀，以 aria-disabled 暫停操作。
   const randomUnavailable = isLoading || allRestaurants.length === 0
   const randomDisabled = !isLoading && allRestaurants.length === 0
+  // 操作按鈕與篩選欄位同高、同圓角，避免沿用全站膠囊按鈕與位移效果。
+  const filterActionStyles = {
+    height: mobile ? 44 : 40,
+    minHeight: mobile ? 44 : 40,
+    px: 1.5,
+    py: 0,
+    fontSize: '1rem',
+    borderRadius: 1,
+    borderWidth: mobile ? 2 : undefined,
+    boxShadow: 'none',
+    '&:hover:not(.Mui-disabled), &:active:not(.Mui-disabled)': {
+      transform: 'none',
+      boxShadow: 'none',
+    },
+  }
 
   // aria-disabled 只提供語意，仍需在事件入口阻擋滑鼠與鍵盤觸發。
   function handleRandomSelect() {
@@ -212,7 +229,9 @@ export default function ResultsPanel({
             display: mobile ? 'flex' : 'grid',
             gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: 1.5,
-            py: 0.5,
+            // 捲動容器會裁切溢出內容，四邊留白容納邊框與聚焦外框。
+            py: mobile ? 1 : 0.5,
+            px: mobile ? 1 : 0,
             // 手機控制項保持可點選寬度，放不下時橫向捲動。
             overflowX: mobile ? 'auto' : undefined,
             '& > *': mobile ? { flexShrink: 0, minWidth: 128 } : {},
@@ -296,32 +315,25 @@ export default function ResultsPanel({
             variant="outlined"
             size="small"
             onClick={() => onFiltersChange({ ...DEFAULT_FILTERS })}
+            aria-label="重新選擇"
             // 與 small 下拉選單同高，寬度沿用相同的 Grid 欄位。
-            sx={{
-              height: mobile ? 44 : 40,
-              minHeight: mobile ? 44 : 40,
-              px: 1.5,
-              py: 0,
-              fontSize: '1rem',
-              borderRadius: 1,
-              boxShadow: 'none',
-              '@media (hover: hover)': {
-                '&:hover:not(.Mui-disabled)': { transform: 'none' },
-              },
-            }}
+            sx={filterActionStyles}
           >
-            重新選擇
+            {/* 手機以圖示節省寬度，aria-label 保留完整操作名稱。 */}
+            {mobile ? <RestoreFromTrashIcon /> : '重新選擇'}
           </Button>
           {mobile && (
             <Button
               variant="outlined"
+              size="small"
+              aria-label="隨機選一家"
               onClick={handleRandomSelect}
               aria-disabled={randomUnavailable}
               disableRipple={isLoading}
               disabled={randomDisabled}
-              sx={{ minHeight: 44 }}
+              sx={filterActionStyles}
             >
-              隨機選一家
+              <CasinoIcon />
             </Button>
           )}
         </Box>
