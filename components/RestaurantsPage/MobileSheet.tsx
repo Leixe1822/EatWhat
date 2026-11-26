@@ -18,6 +18,8 @@ type MobileSheetProps = {
   onHeightChange: (height: number) => void
   onDraggingChange: (dragging: boolean) => void
   count: number
+  // 有店名時顯示詳細資料；收合後仍保留店名，方便再次展開。
+  detailTitle?: string
   children: ReactNode
 }
 
@@ -51,6 +53,7 @@ export default function MobileSheet({
   onHeightChange,
   onDraggingChange,
   count,
+  detailTitle,
   children,
 }: MobileSheetProps) {
   const sheetRef = useRef<HTMLElement>(null)
@@ -125,7 +128,7 @@ export default function MobileSheet({
     <Box
       ref={sheetRef}
       component="section"
-      aria-label="附近餐廳面板"
+      aria-label={detailTitle ? `餐廳資訊：${detailTitle}` : '附近餐廳面板'}
       sx={{
         position: 'absolute',
         zIndex: 3,
@@ -173,9 +176,17 @@ export default function MobileSheet({
       >
         <Box sx={{ width: 42, height: 5, bgcolor: 'divider', borderRadius: 4 }} />
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, flexShrink: 0 }}>
-        <Typography component="h1" sx={{ flex: 1, fontWeight: 800 }} aria-live="polite">
-          {isLoading ? '搜尋中...' : `附近餐廳（${count}）`}
+      {/* 詳細資料已有店名與關閉按鈕，展開時隱藏重複標題。 */}
+      <Box
+        sx={{
+          display: detailTitle && !isCollapsed ? 'none' : 'flex',
+          alignItems: 'center',
+          px: 2,
+          flexShrink: 0,
+        }}
+      >
+        <Typography component="h1" sx={{ flex: 1, minWidth: 0, fontWeight: 800 }} noWrap aria-live="polite">
+          {detailTitle || (isLoading ? '搜尋中...' : `附近餐廳（${count}）`)}
         </Typography>
         <IconButton
           aria-label="展開餐廳面板"
