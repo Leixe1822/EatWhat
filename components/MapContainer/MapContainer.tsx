@@ -1,7 +1,7 @@
 'use client'
 
 // 餐廳地圖：共用一份餐廳資料來產生標記、清單與資訊視窗。
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Box,
   Button,
@@ -138,8 +138,12 @@ export default function MapContainer({
   const [isSheetDragging, setIsSheetDragging] = useState(false)
   const containerRef = useMobileViewport(isMobile)
   const isSheetListVisible = sheetHeight > COLLAPSED_HEIGHT
-  // 手機面板超過半屏時隱藏資訊卡，但不清除已選餐廳。
-  const canShowInfoWindow = !isMobile || sheetHeight <= HALF_OPEN_HEIGHT
+  // 關閉詳細資料後，回到選取前的清單高度。
+  const previousListHeight = useRef(HALF_OPEN_HEIGHT)
+  const detailCardRef = useRef<HTMLDivElement>(null)
+  const detailHeaderRef = useRef<HTMLDivElement>(null)
+  const detailBodyRef = useRef<HTMLDivElement>(null)
+  const [detailHeight, setDetailHeight] = useState(320)
   // 尚未手動切換時依螢幕大小決定；切換後保留使用者的選擇。
   const panelOpen = listOpen ?? isDesktop
 
@@ -150,27 +154,72 @@ export default function MapContainer({
     selectedRestaurant = filteredRestaurants.find(restaurant => restaurant.id === selection.id)
   }
 
+  // 半開的詳細面板依實際內容決定高度；手動拖曳仍保留原本的三段操作。
+  // 量測自然內容高度，不以面板高度反推，避免尺寸互相影響而持續增長。
+  useEffect(() => {
+    const card = detailCardRef.current
+    const header = detailHeaderRef.current
+    const body = detailBodyRef.current
+    if (!isMobile || !selectedRestaurant || !card || !header || !body) return
+
+    const observer = new ResizeObserver(() => {
+      const styles = getComputedStyle(card)
+      const padding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom)
+      const gap = parseFloat(getComputedStyle(body).marginTop) || 0
+      // 44px 是面板把手，2px 是上邊框；安全區域由 CSS 另外加上。
+      const contentHeight = padding + gap + header.offsetHeight + body.scrollHeight
+      const handleAndBorderHeight = 44 + 2
+      setDetailHeight(Math.ceil(handleAndBorderHeight + contentHeight))
+    })
+    observer.observe(card)
+    observer.observe(header)
+    observer.observe(body)
+    return () => observer.disconnect()
+  }, [isMobile, selectedRestaurant])
+
   // 清單和標記都呼叫這個函式，確保資訊視窗與地圖位置同步。
-  function selectRestaurant(restaurant: Restaurant, fromMarker = false) {
+  function selectRestaurant(restaurant: Restaurant) {
+    if (isMobile && !selectedRestaurant) previousListHeight.current = sheetHeight
     setSelection({ id: restaurant.id, results: restaurants })
     map?.panTo(restaurant.location)
     if (!isDesktop) {
-      setSheetHeight(fromMarker ? HALF_OPEN_HEIGHT : COLLAPSED_HEIGHT)
+      // 詳細資料直接取代底部清單，上半部保留地圖。
+      setSheetHeight(HALF_OPEN_HEIGHT)
     }
   }
 
-  // 選中餐廳時保留資訊卡視角，不交由搜尋圈的自動縮放覆蓋。
+  function closeRestaurantDetails() {
+    setSelection(null)
+    if (isMobile) setSheetHeight(previousListHeight.current)
+  }
+
+  // 面板高度穩定後，將標記置於搜尋列下方的可見地圖中央。
   useEffect(() => {
     if (!isMobile || !map || !selectedRestaurant) return
-    const frame = requestAnimationFrame(() => {
+    const mapElement = map.getDiv()
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined
+    const centerSelectedMarker = () => {
+      const height = mapElement.clientHeight
+      if (!height) return
       map.panTo(selectedRestaurant.location)
-      map.panBy(0, -40)
+      map.panBy(0, -Math.min(56, height / 4))
+    }
+    const frame = requestAnimationFrame(centerSelectedMarker)
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(centerSelectedMarker, 150)
     })
-    return () => cancelAnimationFrame(frame)
-  }, [isMobile, map, selectedRestaurant, sheetHeight])
+    observer.observe(mapElement)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(resizeTimer)
+      observer.disconnect()
+    }
+  }, [isMobile, map, selectedRestaurant])
 
   // 手機地址搜尋或定位成功後，更新搜尋中心並收合面板。
   function locateCenter(next: Center) {
+    setSelection(null)
     onCenterChange(next)
     map?.panTo(next)
     setSheetHeight(COLLAPSED_HEIGHT)
@@ -211,6 +260,139 @@ export default function MapContainer({
     />
   )
 
+  // 桌面使用地圖資訊視窗；手機將同一份內容放進底部面板。
+  const restaurantCard = selectedRestaurant && (
+    <Stack
+      ref={detailCardRef}
+      spacing={2}
+      sx={{
+        p: 2,
+        // 手機內容統一內縮，標題、地址與按鈕都避開面板外框。
+        px: isMobile ? '24px' : 2,
+        // 手機按鈕下方保留 64px，量測面板高度時也會納入這段留白。
+        pb: isMobile ? '64px' : 2,
+        m: isMobile ? 0 : 0.5,
+        mb: isMobile ? 0 : 1,
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        border: isMobile ? 0 : '2px solid',
+        borderColor: 'divider',
+        borderRadius: isMobile ? 0 : '20px',
+        boxShadow: isMobile ? 'none' : '3px 3px 0 var(--mui-palette-divider)',
+        flex: isMobile ? 1 : undefined,
+        // 手機卡片由外層可見區域限制高度，只有詳細資料可捲動。
+        maxWidth: isMobile ? undefined : 272,
+        maxHeight: isMobile ? '100%' : undefined,
+        minHeight: 0,
+        boxSizing: 'border-box',
+        overflow: isMobile ? 'hidden' : undefined,
+        overflowWrap: 'anywhere',
+      }}
+    >
+      <Stack ref={detailHeaderRef} direction="row" spacing={1} sx={{ alignItems: 'flex-start', flexShrink: 0 }}>
+        <Typography
+          component="h2"
+          variant="h6"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            fontWeight: 800,
+            lineHeight: 1.4,
+            // 長店名可獨立捲動，保留右側關閉按鈕的可操作空間。
+            maxHeight: isMobile ? 80 : undefined,
+            overflowY: isMobile ? 'auto' : undefined,
+          }}
+        >
+          {selectedRestaurant.name}
+        </Typography>
+        <IconButton
+          size="small"
+          aria-label="關閉餐廳資訊"
+          onClick={closeRestaurantDetails}
+          sx={{ color: 'text.primary', minWidth: 44, minHeight: 44 }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+      {/* 地址與連結自然接續排列；小螢幕可一起捲動，底部留白避免按鈕貼邊。 */}
+      <Stack
+        ref={detailBodyRef}
+        spacing={2}
+        sx={{
+          minHeight: 0,
+          // 捲動容器會裁切子元素陰影與焦點框，需在容器內預留 8px。
+          // 同時向左右延伸容器，維持內容原本的 24px 對齊位置。
+          p: isMobile ? '8px' : 0,
+          width: isMobile ? 'calc(100% + 16px)' : undefined,
+          alignSelf: isMobile ? 'center' : undefined,
+          boxSizing: 'border-box',
+          overflowY: isMobile ? 'auto' : undefined,
+          overscrollBehavior: 'contain',
+          '& > *': { flexShrink: 0 },
+        }}
+      >
+        {/* 評分與營業狀態並排顯示。 */}
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <Chip
+            icon={<StarRoundedIcon />}
+            label={selectedRestaurant.rating === null ? '尚無評分' : `${selectedRestaurant.rating}`}
+            sx={{
+              alignSelf: 'flex-start',
+              bgcolor: selectedRestaurant.rating === null ? 'action.hover' : 'primary.main',
+              color: 'text.primary',
+              fontWeight: 800,
+              border: '1px solid',
+              borderColor: 'divider',
+              '& .MuiChip-icon': { color: 'text.primary' },
+            }}
+          />
+          {/* 僅以已取得的營業狀態顯示；缺值不能當成休息中。 */}
+          <Chip
+            label={selectedRestaurant.openNow == null
+              ? '營業狀態未知'
+              : selectedRestaurant.openNow ? '營業中' : '休息中'}
+            variant="outlined"
+            sx={{
+              alignSelf: 'flex-start',
+              color: 'text.primary',
+              bgcolor: selectedRestaurant.openNow === true ? 'primary.light' : 'background.paper',
+              borderColor: 'divider',
+              fontWeight: 700,
+            }}
+          />
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ pt: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'flex-start' }}
+        >
+          <LocationOnIcon sx={{ fontSize: 20, mt: 0.4, color: 'text.secondary' }} />
+          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
+            {selectedRestaurant.address}
+          </Typography>
+        </Stack>
+        {/* 連結缺值時不建立按鈕；新分頁開啟以保留目前地圖與篩選。 */}
+        {selectedRestaurant.uri && /^https:\/\//i.test(selectedRestaurant.uri) && (
+          <Button
+            component="a"
+            href={selectedRestaurant.uri}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outlined"
+            size="small"
+            sx={{
+              flexShrink: 0,
+              minHeight: 44,
+            }}
+            aria-label={`在 Google Maps 開啟 ${selectedRestaurant.name}（新分頁）`}
+          >
+            在 Google Maps 開啟 ↗
+          </Button>
+        )}
+      </Stack>
+    </Stack>
+  )
+
   return (
     <Box
       ref={containerRef}
@@ -226,7 +408,9 @@ export default function MapContainer({
         inset: isMobile ? 'var(--mobile-top, 0px) 0 auto' : undefined,
         height: isMobile ? 'var(--mobile-height, 100dvh)' : undefined,
         overflow: isMobile ? 'hidden' : undefined,
-        '--sheet-size': `clamp(calc(88px + env(safe-area-inset-bottom)), ${sheetHeight}%, calc(100% - 120px - env(safe-area-inset-top)))`,
+        '--sheet-size': isMobile && selectedRestaurant && sheetHeight === HALF_OPEN_HEIGHT && !isSheetDragging
+          ? `min(calc(${detailHeight}px + env(safe-area-inset-bottom)), calc(100% - 120px - env(safe-area-inset-top)))`
+          : `clamp(calc(88px + env(safe-area-inset-bottom)), ${sheetHeight}%, calc(100% - 120px - env(safe-area-inset-top)))`,
         display: isMobile ? 'block' : 'grid',
         flex: 1,
         minHeight: { xs: 0, md: 360 },
@@ -247,8 +431,9 @@ export default function MapContainer({
           onHeightChange={setSheetHeight}
           onDraggingChange={setIsSheetDragging}
           count={filteredRestaurants.length}
+          detailTitle={selectedRestaurant?.name}
         >
-          {resultsPanel}
+          {selectedRestaurant ? restaurantCard : resultsPanel}
         </MobileSheet>
       ) : (
         resultsPanel
@@ -360,7 +545,7 @@ export default function MapContainer({
               key={restaurant.id}
               position={restaurant.location}
               title={restaurant.name}
-              onClick={() => selectRestaurant(restaurant, true)}
+              onClick={() => selectRestaurant(restaurant)}
               zIndex={selectedRestaurant?.id === restaurant.id ? 2 : 1}
             >
               <LocationOnIcon
@@ -378,109 +563,17 @@ export default function MapContainer({
             </AdvancedMarker>
           ))}
           {/* 只有選中餐廳時才建立 InfoWindow；關閉只清空 selection。 */}
-          {selectedRestaurant && canShowInfoWindow && (
+          {selectedRestaurant && !isMobile && (
             <InfoWindow
               key={selectedRestaurant.id}
               position={selectedRestaurant.location}
               pixelOffset={[0, -40]}
-              maxWidth={isMobile ? 288 : 320}
+              maxWidth={320}
               ariaLabel={selectedRestaurant.name}
               headerDisabled
               onClose={() => setSelection(null)}
             >
-              {/* 延續品牌的深色邊框與硬陰影，評分以酸橙綠標籤強調。 */}
-              <Stack
-                spacing={2}
-                sx={{
-                  p: 2,
-                  m: 0.5,
-                  mb: 1,
-                  bgcolor: 'background.paper',
-                  color: 'text.primary',
-                  border: '2px solid',
-                  borderColor: 'divider',
-                  borderRadius: '20px',
-                  boxShadow: '3px 3px 0 var(--mui-palette-divider)',
-                  // 手機保留搜尋區與地圖空間；內容較多時只捲動資訊卡。
-                  maxWidth: isMobile ? 'min(240px, calc(100vw - 72px))' : 272,
-                  maxHeight: isMobile ? 'min(240px, 30dvh)' : undefined,
-                  overflowY: isMobile ? 'auto' : undefined,
-                  overscrollBehavior: 'contain',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                  <Typography
-                    component="h2"
-                    variant="h6"
-                    sx={{ flex: 1, minWidth: 0, fontWeight: 800, lineHeight: 1.4 }}
-                  >
-                    {selectedRestaurant.name}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    aria-label="關閉餐廳資訊"
-                    onClick={() => setSelection(null)}
-                    sx={{ color: 'text.primary', minWidth: 44, minHeight: 44 }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-                {/* 評分與營業狀態並排顯示。 */}
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Chip
-                    icon={<StarRoundedIcon />}
-                    label={selectedRestaurant.rating === null ? '尚無評分' : `${selectedRestaurant.rating}`}
-                    sx={{
-                      alignSelf: 'flex-start',
-                      bgcolor: selectedRestaurant.rating === null ? 'action.hover' : 'primary.main',
-                      color: 'text.primary',
-                      fontWeight: 800,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '& .MuiChip-icon': { color: 'text.primary' },
-                    }}
-                  />
-                  {/* 僅以已取得的營業狀態顯示；缺值不能當成休息中。 */}
-                  <Chip
-                    label={selectedRestaurant.openNow == null
-                      ? '營業狀態未知'
-                      : selectedRestaurant.openNow ? '營業中' : '休息中'}
-                    variant="outlined"
-                    sx={{
-                      alignSelf: 'flex-start',
-                      color: 'text.primary',
-                      bgcolor: selectedRestaurant.openNow === true ? 'primary.light' : 'background.paper',
-                      borderColor: 'divider',
-                      fontWeight: 700,
-                    }}
-                  />
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ pt: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'flex-start' }}
-                >
-                  <LocationOnIcon sx={{ fontSize: 20, mt: 0.4, color: 'text.secondary' }} />
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
-                    {selectedRestaurant.address}
-                  </Typography>
-                </Stack>
-                {/* 連結缺值時不建立按鈕；新分頁開啟以保留目前地圖與篩選。 */}
-                {selectedRestaurant.uri && /^https:\/\//i.test(selectedRestaurant.uri) && (
-                  <Button
-                    component="a"
-                    href={selectedRestaurant.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="outlined"
-                    size="small"
-                    aria-label={`在 Google Maps 開啟 ${selectedRestaurant.name}（新分頁）`}
-                  >
-                    在 Google Maps 開啟 ↗
-                  </Button>
-                )}
-              </Stack>
+              {restaurantCard}
             </InfoWindow>
           )}
         </Map>
